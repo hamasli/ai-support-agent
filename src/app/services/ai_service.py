@@ -2,11 +2,16 @@
 import json
 
 from openai import OpenAI
+from pydantic import ValidationError
 
 from src.app.core.config import settings
 from src.app.tools.order_tools import get_order_status
 from src.app.tools.support_tools import create_support_ticket;
 from src.app.tools.support_tools import escalate_to_human;
+from src.app.schemas.tool_schemas import OrderStatusArgs,CreateTicketArgs,EscalateArgs;
+
+
+
 client = OpenAI(api_key=settings.openai_api_key)
 
 # This is the description of the tools that we give to model , when to use.
@@ -74,28 +79,47 @@ tools = [
 
 ]
 
+
+# here we are calling the tools for the AI tasks, and also validating the each tool arguments.
+# ORD-1001   ✅
+# ORD-22     ❌
+
+# CUST-001   ✅
+# UST-001    ❌
 def execute_tool(name: str, arguments: dict) -> dict:
+    try:
+        if name == "get_order_status":
+            args = OrderStatusArgs.model_validate(arguments)
 
-    if name == "get_order_status":
-        return get_order_status(
-            order_id=arguments["order_id"]
-        )
+            return get_order_status(
+                order_id=args.order_id
+            )
 
-    if name == "create_support_ticket":
-        return create_support_ticket(
-            customer_id=arguments["customer_id"],
-            issue=arguments["issue"],
-        )
+        if name == "create_support_ticket":
+            args = CreateTicketArgs.model_validate(arguments)
 
-    if name == "escalate_to_human":
-        return escalate_to_human(
-            customer_id=arguments["customer_id"],
-            reason=arguments["reason"],
-        )
+            return create_support_ticket(
+                customer_id=args.customer_id,
+                issue=args.issue,
+            )
 
-    return {
-        "error": f"Unknown tool: {name}"
-    }
+        if name == "escalate_to_human":
+            args = EscalateArgs.model_validate(arguments)
+
+            return escalate_to_human(
+                customer_id=args.customer_id,
+                reason=args.reason,
+            )
+
+        return {
+            "error": f"Unknown tool: {name}"
+        }
+
+    except ValidationError as error:
+        return {
+            "error": "Invalid tool arguments",
+            "details": error.errors(include_url=False),
+        }
 
 
 #first we are giving query to AI
