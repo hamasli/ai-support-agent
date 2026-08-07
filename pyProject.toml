@@ -4,9 +4,10 @@ version="0.1.0"
 description="Production-style AI customer support agent"
 requires-python=">=3.13"
 
-dependencies=[
+dependencies = [
     "fastapi",
-    "uvicorn
-    [standard]",
-    "pydantic"
+    "uvicorn[standard]",
+    "pydantic",
+    "pydantic-settings",
+    "openai"
 ]
