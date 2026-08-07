@@ -6,7 +6,7 @@ from openai import OpenAI
 from src.app.core.config import settings
 from src.app.tools.order_tools import get_order_status
 from src.app.tools.support_tools import create_support_ticket;
-
+from src.app.tools.support_tools import escalate_to_human;
 client = OpenAI(api_key=settings.openai_api_key)
 
 # This is the description of the tools that we give to model , when to use.
@@ -48,9 +48,55 @@ tools = [
         "additionalProperties": False,
     },
     "strict": True,
+},
+
+{
+    "type": "function",
+    "name": "escalate_to_human",
+    "description": "Escalate a customer's issue to a human support agent.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "customer_id": {
+                "type": "string",
+                "description": "Customer ID, for example CUST-001",
+            },
+            "reason": {
+                "type": "string",
+                "description": "Reason why human support is needed",
+            },
+        },
+        "required": ["customer_id", "reason"],
+        "additionalProperties": False,
+    },
+    "strict": True,
 }
 
 ]
+
+def execute_tool(name: str, arguments: dict) -> dict:
+
+    if name == "get_order_status":
+        return get_order_status(
+            order_id=arguments["order_id"]
+        )
+
+    if name == "create_support_ticket":
+        return create_support_ticket(
+            customer_id=arguments["customer_id"],
+            issue=arguments["issue"],
+        )
+
+    if name == "escalate_to_human":
+        return escalate_to_human(
+            customer_id=arguments["customer_id"],
+            reason=arguments["reason"],
+        )
+
+    return {
+        "error": f"Unknown tool: {name}"
+    }
+
 
 #first we are giving query to AI
 #then ai decides that do we need to use the tool or not 
@@ -69,11 +115,13 @@ def generate_ai_reply(message: str) -> str:
         instructions=(
             "You are a customer-support assistant. "
             "Use get_order_status for order-status questions. "
-            "Use create_support_ticket when the customer asks to create a support ticket. "
-            "Never invent an order ID or customer ID. "
-            "If required information is missing, ask the user for it. "
-            "Do not offer actions that are not available through your tools."
-                ),
+            "Use create_support_ticket when the customer wants a support ticket. "
+            "Use escalate_to_human when the customer explicitly asks for a human "
+            "or when the issue cannot be handled with the available tools. "
+            "Never invent customer IDs or order IDs. "
+            "Ask for required information when it is missing. "
+            "Do not claim to perform actions that are not available through your tools."
+        ),
         tools=tools,
         input=input_list,
     )
@@ -83,46 +131,28 @@ def generate_ai_reply(message: str) -> str:
     tool_was_called = False
 
     for item in response.output:
-        if item.type == "function_call" and item.name == "get_order_status":
-            arguments = json.loads(item.arguments)
 
-            #python is running the tool.
-            result = get_order_status(
-                order_id=arguments["order_id"]
-            )
+        print(item.type);
+        if item.type != "function_call":
+            continue
 
-            #now here we have tell openai what happend.
-            # AI tool request #123
-            #    ↓
-            # Python executes it
-            #     ↓
-            # Tool result for request #123
-            input_list.append(
-                {
-                    "type": "function_call_output",
-                    "call_id": item.call_id,
-                    #call id connects the results to the exact tool call the model mode.
-                    "output": json.dumps(result),
-                }
-            )
+        arguments = json.loads(item.arguments)
+        
+        result = execute_tool(
+            name=item.name,
+            arguments=arguments,
+        )
 
-            tool_was_called = True
-        elif item.type=="function_call" and item.name=="create_support_ticket":
-            arguments=json. loads(item.arguments)
-            result=create_support_ticket(
-                customer_id=arguments["customer_id"],
-                issue=arguments["issue"],
-            )
 
-            input_list.append(
-                {
-                    "type":"function_call_output",
-                    "call_id":item.call_id,
-                    "output":json.dumps(result),
-                }
-            )
-            tool_was_called=True
+        input_list.append(
+            {
+                "type": "function_call_output",
+                "call_id": item.call_id,
+                "output": json.dumps(result),
+            }
+        )
 
+        tool_was_called = True
 
     if not tool_was_called:
         return response.output_text

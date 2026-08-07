@@ -16,3 +16,14 @@ def create_support_ticket(
         "issue": issue,
         "status":"open",
   }
+
+
+def escalate_to_human(
+        customer_id:str,
+        reason:str,
+)-> dict:
+    return {
+        "customer_id":customer_id,
+        "reason":reason,
+        "status":"escalated",
+    }
