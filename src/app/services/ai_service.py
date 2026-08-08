@@ -134,52 +134,58 @@ def generate_ai_reply(message: str) -> str:
         }
     ]
 
-    response = client.responses.create(
-        model=settings.openai_model,
-        instructions=(
-            "You are a customer-support assistant. "
-            "Use get_order_status for order-status questions. "
-            "Use create_support_ticket when the customer wants a support ticket. "
-            "Use escalate_to_human when the customer explicitly asks for a human "
-            "or when the issue cannot be handled with the available tools. "
-            "Never invent customer IDs or order IDs. "
-            "Ask for required information when it is missing. "
-            "Do not claim to perform actions that are not available through your tools."
-        ),
-        tools=tools,
-        input=input_list,
+    instructions = (
+        "You are a customer-support assistant. "
+        "Use get_order_status for order-status questions. "
+        "Use create_support_ticket when the customer wants a support ticket. "
+        "Use escalate_to_human when the customer explicitly asks for a human "
+        "or when the issue cannot be handled with the available tools. "
+        "Never invent customer IDs or order IDs. "
+        "Ask for required information when it is missing. "
+        "Do not claim to perform actions that are not available through your tools."
     )
-    #combining what user wants, and the model request. and later we will use this also. at the end.
-    input_list += response.output
 
-    tool_was_called = False
+    max_steps = 5
 
-    for item in response.output:
+    for _ in range(max_steps):
 
-        print(item.type);
-        if item.type != "function_call":
-            continue
-
-        arguments = json.loads(item.arguments)
-        
-        result = execute_tool(
-            name=item.name,
-            arguments=arguments,
+        response = client.responses.create(
+            model=settings.openai_model,
+            instructions=instructions,
+            tools=tools,
+            input=input_list,
         )
 
+        input_list += response.output
+        # Find all the tools that the AI requested.
+        function_calls = [
+            item
+            for item in response.output
+            if item.type == "function_call"
+        ]
 
-        input_list.append(
-            {
-                "type": "function_call_output",
-                "call_id": item.call_id,
-                "output": json.dumps(result),
-            }
-        )
+        # No tool requested → final answer
+        if not function_calls:
+            return response.output_text
 
-        tool_was_called = True
+        # Execute every requested tool
+        for item in function_calls:
+            arguments = json.loads(item.arguments)
 
-    if not tool_was_called:
-        return response.output_text
+            result = execute_tool(
+                name=item.name,
+                arguments=arguments,
+            )
+
+            input_list.append(
+                {
+                    "type": "function_call_output",
+                    "call_id": item.call_id,
+                    "output": json.dumps(result),
+                }
+            )
+
+    return "Sorry, I could not complete the request within the allowed steps."
 
 # Now we need OpenAI to turn that raw tool result into a nice human answer.
 # So the second request receives the complete history:(user input, first ai response, then tool output)
