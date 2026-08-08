@@ -6,11 +6,17 @@ from pydantic import ValidationError
 
 from src.app.core.config import settings
 from src.app.tools.order_tools import get_order_status
-from src.app.tools.support_tools import create_support_ticket;
-from src.app.tools.support_tools import escalate_to_human;
-from src.app.schemas.tool_schemas import OrderStatusArgs,CreateTicketArgs,EscalateArgs;
-
-
+from src.app.tools.support_tools import (
+    create_support_ticket,
+    escalate_to_human,
+    request_refund,
+)
+from src.app.schemas.tool_schemas import (
+    OrderStatusArgs,
+    CreateTicketArgs,
+    EscalateArgs,
+    RefundRequestArgs,
+)
 
 client = OpenAI(api_key=settings.openai_api_key)
 
@@ -33,10 +39,10 @@ tools = [
         },
         "strict": True,
     },
-    {
+  {
     "type": "function",
     "name": "create_support_ticket",
-    "description": "Create a support ticket for a customer.",
+    "description": "Create a support ticket related to a customer's order.",
     "parameters": {
         "type": "object",
         "properties": {
@@ -44,17 +50,24 @@ tools = [
                 "type": "string",
                 "description": "Customer ID, for example CUST-001",
             },
+            "order_id": {
+                "type": "string",
+                "description": "Order ID, for example ORD-1001",
+            },
             "issue": {
                 "type": "string",
                 "description": "Description of the customer's problem",
             },
         },
-        "required": ["customer_id", "issue"],
+        "required": [
+            "customer_id",
+            "order_id",
+            "issue",
+        ],
         "additionalProperties": False,
     },
     "strict": True,
 },
-
 {
     "type": "function",
     "name": "escalate_to_human",
@@ -72,6 +85,38 @@ tools = [
             },
         },
         "required": ["customer_id", "reason"],
+        "additionalProperties": False,
+    },
+    "strict": True,
+},
+{
+    "type": "function",
+    "name": "request_refund",
+    "description": (
+        "Create a pending refund request for a customer's order. "
+        "This does not approve or complete the refund."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "customer_id": {
+                "type": "string",
+                "description": "Customer ID, for example CUST-001",
+            },
+            "order_id": {
+                "type": "string",
+                "description": "Order ID, for example ORD-1001",
+            },
+            "reason": {
+                "type": "string",
+                "description": "Reason the customer is requesting a refund",
+            },
+        },
+        "required": [
+            "customer_id",
+            "order_id",
+            "reason",
+        ],
         "additionalProperties": False,
     },
     "strict": True,
@@ -101,6 +146,7 @@ def execute_tool(name: str, arguments: dict) -> dict:
             return create_support_ticket(
                 customer_id=args.customer_id,
                 issue=args.issue,
+                order_id=args.order_id,
             )
 
         if name == "escalate_to_human":
@@ -108,6 +154,15 @@ def execute_tool(name: str, arguments: dict) -> dict:
 
             return escalate_to_human(
                 customer_id=args.customer_id,
+                reason=args.reason,
+            )
+
+        if name == "request_refund":
+            args = RefundRequestArgs.model_validate(arguments)
+
+            return request_refund(
+                customer_id=args.customer_id,
+                order_id=args.order_id,
                 reason=args.reason,
             )
 
@@ -141,6 +196,9 @@ def generate_ai_reply(message: str) -> str:
         "Use escalate_to_human when the customer explicitly asks for a human "
         "or when the issue cannot be handled with the available tools. "
         "Never invent customer IDs or order IDs. "
+        "Use request_refund when the customer asks for a refund. "
+        "Refund requests are only pending approval;"
+        " never tell the customer that a refund has been completed or approved. "
         "Ask for required information when it is missing. "
         "Do not claim to perform actions that are not available through your tools."
     )
