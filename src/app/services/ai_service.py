@@ -18,7 +18,13 @@ from src.app.schemas.tool_schemas import (
     RefundRequestArgs,
 )
 
-client = OpenAI(api_key=settings.openai_api_key)
+client = OpenAI(
+    api_key=settings.openai_api_key,
+    timeout=20.0,
+    # max_retries=2   → retry temporary API failures twice
+    max_retries=2
+
+    )
 
 # This is the description of the tools that we give to model , when to use.
 tools = [
@@ -175,6 +181,10 @@ def execute_tool(name: str, arguments: dict) -> dict:
             "error": "Invalid tool arguments",
             "details": error.errors(include_url=False),
         }
+    except Exception:
+        return {
+            "error": "Tool execution failed"
+        }
 
 
 #first we are giving query to AI
@@ -204,7 +214,10 @@ def generate_ai_reply(message: str) -> str:
     )
 
     max_steps = 5
-
+    max_tool_calls=8;
+    tool_call_count=0;
+    #limit total tool calls
+    
     for _ in range(max_steps):
 
         response = client.responses.create(
@@ -229,6 +242,13 @@ def generate_ai_reply(message: str) -> str:
         # Execute every requested tool
         for item in function_calls:
             arguments = json.loads(item.arguments)
+            tool_call_count += 1
+
+            if tool_call_count > max_tool_calls:
+                return (
+                    "Sorry, I could not safely complete the request "
+                    "because too many actions were required."
+                )
 
             result = execute_tool(
                 name=item.name,
