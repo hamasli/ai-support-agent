@@ -1,6 +1,9 @@
 
 import json
-
+from src.app.services.conversation_service import (
+    get_conversation_messages,
+    save_tool_call,
+)
 from openai import OpenAI
 from pydantic import ValidationError
 
@@ -191,13 +194,15 @@ def execute_tool(name: str, arguments: dict) -> dict:
 #then ai decides that do we need to use the tool or not 
 #if yes, then we call the python tool and return the order id, and then we give this results again to AI.
 #then AI gives us the final answer.
-def generate_ai_reply(message: str) -> str:
-    input_list = [
-        {
-            "role": "user",
-            "content": message,
-        }
-    ]
+def generate_ai_reply(
+    message: str,
+    conversation_id: str,
+) -> str:
+    
+    # adding the previous  context of the chat.
+    input_list = get_conversation_messages(
+    conversation_id=conversation_id
+)
 
     instructions = (
         "You are a customer-support assistant. "
@@ -254,7 +259,12 @@ def generate_ai_reply(message: str) -> str:
                 name=item.name,
                 arguments=arguments,
             )
-
+            save_tool_call(
+                conversation_id=conversation_id,
+                tool_name=item.name,
+                arguments=json.dumps(arguments),
+                result=json.dumps(result),
+            )
             input_list.append(
                 {
                     "type": "function_call_output",
