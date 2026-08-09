@@ -3,7 +3,7 @@ from sqlalchemy import create_engine;
 # This creates database sessions that we will use to actually run queries.
 from sqlalchemy.orm import sessionmaker;
 from src.app.core.config import settings;
-from sqlalchemy import text
+from sqlalchemy import text;
 
 
 
@@ -14,7 +14,7 @@ engine=create_engine(
     settings.database_url,
     echo=False,
 )
-Sessionlocal=sessionmaker(
+SessionLocal=sessionmaker(
     bind=engine,
     autoflush=False,
     autocommit=False,
