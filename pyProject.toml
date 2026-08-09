@@ -9,5 +9,8 @@ dependencies = [
     "uvicorn[standard]",
     "pydantic",
     "pydantic-settings",
-    "openai"
+    "openai",
+    "sqlalchemy",
+    "psycopg[binary]",
+    "alembic",
 ]
