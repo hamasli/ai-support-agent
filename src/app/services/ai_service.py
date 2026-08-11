@@ -14,12 +14,15 @@ from src.app.tools.support_tools import (
     create_support_ticket,
     escalate_to_human,
     request_refund,
+    
 )
+from src.app.tools.knowledge_tools import search_knowledge_base
 from src.app.schemas.tool_schemas import (
     OrderStatusArgs,
     CreateTicketArgs,
     EscalateArgs,
     RefundRequestArgs,
+    KnowledgeSearchArgs
 )
 
 client = OpenAI(
@@ -130,6 +133,30 @@ tools = [
         "additionalProperties": False,
     },
     "strict": True,
+},
+{
+    "type": "function",
+    "name": "search_knowledge_base",
+    "description": (
+        "Search the company knowledge base and documentation. "
+        "Use this for questions about policies, instructions, "
+        "product information, help documentation, or general "
+        "company information."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "question": {
+                "type": "string",
+                "description": (
+                    "The user's question to search for "
+                    "in the knowledge base."
+                ),
+            }
+        },
+        "required": ["question"],
+        "additionalProperties": False,
+    },
 }
 
 ]
@@ -176,6 +203,14 @@ def execute_tool(name: str, arguments: dict) -> dict:
                 reason=args.reason,
             )
 
+        if name == "search_knowledge_base":
+
+            args = KnowledgeSearchArgs(**arguments)
+
+            return search_knowledge_base(
+                question=args.question,
+            )
+
         return {
             "error": f"Unknown tool: {name}"
         }
@@ -204,20 +239,52 @@ def generate_ai_reply(
     input_list = get_conversation_messages(
     conversation_id=conversation_id
 )
+    instructions = """
+        You are a customer-support assistant for this company.
 
-    instructions = (
-        "You are a customer-support assistant. "
-        "Use get_order_status for order-status questions. "
-        "Use create_support_ticket when the customer wants a support ticket. "
-        "Use escalate_to_human when the customer explicitly asks for a human "
-        "or when the issue cannot be handled with the available tools. "
-        "Never invent customer IDs or order IDs. "
-        "Use request_refund when the customer asks for a refund. "
-        "Refund requests are only pending approval;"
-        " never tell the customer that a refund has been completed or approved. "
-        "Ask for required information when it is missing. "
-        "Do not claim to perform actions that are not available through your tools."
-    )
+        Use get_order_status for order-status questions.
+
+        Use create_support_ticket when the customer wants a support ticket.
+
+        Use escalate_to_human when the customer explicitly asks for a human
+        or when the issue cannot be handled with the available tools.
+
+        Use request_refund when the customer asks for a refund.
+        Refund requests are only pending approval.
+        Never tell the customer that a refund has been completed or approved.
+
+        Never invent customer IDs or order IDs.
+        Ask for required information when it is missing.
+
+        Use search_knowledge_base for questions about company documentation,
+        policies, instructions, products, delivery, returns, refunds,
+        damaged items, cancellations, or other company information.
+
+        For company-information questions, you MUST use search_knowledge_base
+        before answering.
+
+        Do not answer company-information questions from your own general knowledge.
+
+        If search_knowledge_base returns found=false, clearly tell the user
+        that the information is not available in the company knowledge base.
+
+        For questions that are unrelated to customer support or the company,
+        do not answer using general knowledge.
+        Politely explain that you can only assist with company customer-support matters.
+
+        Use relevant information already available in the conversation history.
+
+        Do not invent company policies, documentation, or actions.
+        Do not claim to perform actions that are not available through your tools.
+        When search_knowledge_base returns relevant documentation,
+        base your answer only on that documentation.
+
+        When using information from search_knowledge_base,
+        include the relevant source URL or URLs in the final response.
+
+        Do not invent source URLs.
+        Only use URLs returned by search_knowledge_base.
+        """
 
     max_steps = 5
     max_tool_calls=8;

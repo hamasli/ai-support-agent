@@ -13,4 +13,8 @@ dependencies = [
     "sqlalchemy",
     "psycopg[binary]",
     "alembic",
+    "pgvector",
+    "beautifulsoup4",
+    "httpx",
+    "langchain-text-splitters"
 ]
