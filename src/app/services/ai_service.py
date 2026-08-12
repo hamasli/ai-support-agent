@@ -284,6 +284,18 @@ def generate_ai_reply(
 
         Do not invent source URLs.
         Only use URLs returned by search_knowledge_base.
+
+        When calling search_knowledge_base, make the search question
+        self-contained using relevant conversation history.
+
+        Resolve references such as "it", "that item", "that order",
+        "they", or "this product" when the previous conversation
+        makes their meaning clear.
+
+        When search_knowledge_base returns relevant documentation,
+        answer using that documentation and include the returned source URLs.
+
+        Do not invent source URLs.
         """
 
     max_steps = 5
