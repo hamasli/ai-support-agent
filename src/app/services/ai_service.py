@@ -24,6 +24,7 @@ from src.app.schemas.tool_schemas import (
     RefundRequestArgs,
     KnowledgeSearchArgs
 )
+from src.app.services.tool_service import execute_tool
 
 client = OpenAI(
     api_key=settings.openai_api_key,
