@@ -388,6 +388,8 @@ instructions = """
     relevant next actions unless the customer asks for full instructions.
 
     Do not repeat the same information multiple times.
+    Do not offer to check or provide tracking details unless an
+    available tool explicitly returns or supports tracking information.
 
     Clearly distinguish between:
     - pending
@@ -544,7 +546,10 @@ def agent_node(
 
     # If no tool calls remain,
     # we have the final assistant response.
+    # If no tool calls remain,
+    # we have the final assistant response.
     if not function_calls:
+
         # Save the final assistant response.
         result["final_response"] = (
             response.output_text
@@ -557,7 +562,15 @@ def agent_node(
         # does not inherit the old approval/rejection.
         result["refund_tool_approved"] = None
 
-    return result
+        # IMPORTANT:
+        # This OpenAI response chain is now finished.
+        #
+        # A future /chat request should start a fresh
+        # model call using the conversation history
+        # loaded from PostgreSQL.
+        result["previous_response_id"] = None
+
+        return result;
 
 
 def route_after_agent(
@@ -1230,19 +1243,17 @@ builder.add_edge(
 )
 
 
-# After updating the database,
-# create the deterministic final response.
+# ---------------------------------------------------------
+# AFTER REFUND DECISION
+# ---------------------------------------------------------
+
+# Once the refund becomes approved/rejected,
+# send that result back to the AI.
+#
+# The AI then generates the final customer response.
 builder.add_edge(
     "refund_decision_node",
-    "refund_response_node",
-)
-
-
-# The deterministic refund response
-# finishes this workflow.
-builder.add_edge(
-    "refund_response_node",
-    END,
+    "agent_node",
 )
 
 

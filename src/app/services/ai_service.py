@@ -163,68 +163,68 @@ tools = [
 ]
 
 
-# here we are calling the tools for the AI tasks, and also validating the each tool arguments.
-# ORD-1001   ✅
-# ORD-22     ❌
+# # here we are calling the tools for the AI tasks, and also validating the each tool arguments.
+# # ORD-1001   ✅
+# # ORD-22     ❌
 
-# CUST-001   ✅
-# UST-001    ❌
-def execute_tool(name: str, arguments: dict) -> dict:
-    try:
-        if name == "get_order_status":
-            args = OrderStatusArgs.model_validate(arguments)
+# # CUST-001   ✅
+# # UST-001    ❌
+# def execute_tool(name: str, arguments: dict) -> dict:
+#     try:
+#         if name == "get_order_status":
+#             args = OrderStatusArgs.model_validate(arguments)
 
-            return get_order_status(
-                order_id=args.order_id
-            )
+#             return get_order_status(
+#                 order_id=args.order_id
+#             )
 
-        if name == "create_support_ticket":
-            args = CreateTicketArgs.model_validate(arguments)
+#         if name == "create_support_ticket":
+#             args = CreateTicketArgs.model_validate(arguments)
 
-            return create_support_ticket(
-                customer_id=args.customer_id,
-                issue=args.issue,
-                order_id=args.order_id,
-            )
+#             return create_support_ticket(
+#                 customer_id=args.customer_id,
+#                 issue=args.issue,
+#                 order_id=args.order_id,
+#             )
 
-        if name == "escalate_to_human":
-            args = EscalateArgs.model_validate(arguments)
+#         if name == "escalate_to_human":
+#             args = EscalateArgs.model_validate(arguments)
 
-            return escalate_to_human(
-                customer_id=args.customer_id,
-                reason=args.reason,
-            )
+#             return escalate_to_human(
+#                 customer_id=args.customer_id,
+#                 reason=args.reason,
+#             )
 
-        if name == "request_refund":
-            args = RefundRequestArgs.model_validate(arguments)
+#         if name == "request_refund":
+#             args = RefundRequestArgs.model_validate(arguments)
 
-            return request_refund(
-                customer_id=args.customer_id,
-                order_id=args.order_id,
-                reason=args.reason,
-            )
+#             return request_refund(
+#                 customer_id=args.customer_id,
+#                 order_id=args.order_id,
+#                 reason=args.reason,
+#             )
 
-        if name == "search_knowledge_base":
+#         if name == "search_knowledge_base":
 
-            args = KnowledgeSearchArgs(**arguments)
+#             args = KnowledgeSearchArgs(**arguments)
 
-            return search_knowledge_base(
-                question=args.question,
-            )
+#             return search_knowledge_base(
+#                 question=args.question,
+#             )
 
-        return {
-            "error": f"Unknown tool: {name}"
-        }
+#         return {
+#             "error": f"Unknown tool: {name}"
+#         }
 
-    except ValidationError as error:
-        return {
-            "error": "Invalid tool arguments",
-            "details": error.errors(include_url=False),
-        }
-    except Exception:
-        return {
-            "error": "Tool execution failed"
-        }
+#     except ValidationError as error:
+#         return {
+#             "error": "Invalid tool arguments",
+#             "details": error.errors(include_url=False),
+#         }
+#     except Exception:
+#         return {
+#             "error": "Tool execution failed"
+#         }
 
 
 #first we are giving query to AI
