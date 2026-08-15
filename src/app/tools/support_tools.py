@@ -4,7 +4,7 @@ from src.app.db.models.customer import Customer
 from src.app.db.models.order import Order
 from src.app.db.models.ticket import Ticket
 from src.app.db.session import SessionLocal
-
+from sqlalchemy import select;
 #database imports
 from src.app.db.models.customer import Customer
 from src.app.db.models.order import Order
@@ -101,16 +101,23 @@ def escalate_to_human(
             "reason": escalation.reason,
             "status": escalation.status,
         }
-
 def request_refund(
     customer_id: str,
     order_id: str,
     reason: str,
+    conversation_id: str | None = None,
 ) -> dict:
 
     with SessionLocal() as db:
 
-        customer = db.get(Customer, customer_id)
+        # -------------------------------------------------
+        # VALIDATE CUSTOMER
+        # -------------------------------------------------
+
+        customer = db.get(
+            Customer,
+            customer_id,
+        )
 
         if customer is None:
             return {
@@ -118,7 +125,14 @@ def request_refund(
                 "customer_id": customer_id,
             }
 
-        order = db.get(Order, order_id)
+        # -------------------------------------------------
+        # VALIDATE ORDER
+        # -------------------------------------------------
+
+        order = db.get(
+            Order,
+            order_id,
+        )
 
         if order is None:
             return {
@@ -128,15 +142,74 @@ def request_refund(
 
         if order.customer_id != customer_id:
             return {
-                "error": "This order does not belong to this customer."
+                "error": (
+                    "This order does not belong "
+                    "to this customer."
+                )
             }
 
-        refund_id = f"REF-{uuid.uuid4().hex[:6].upper()}"
+        # -------------------------------------------------
+        # DUPLICATE REFUND PROTECTION
+        # -------------------------------------------------
+
+        existing_refund = db.scalar(
+            select(RefundRequest)
+            .where(
+                RefundRequest.customer_id
+                == customer_id,
+
+                RefundRequest.order_id
+                == order_id,
+
+                RefundRequest.status.in_(
+                    [
+                        "pending_approval",
+                        "approved",
+                    ]
+                ),
+            )
+            .limit(1)
+        )
+
+        # An active refund already exists.
+        if existing_refund is not None:
+
+            return {
+                "refund_id": existing_refund.id,
+                "customer_id": (
+                    existing_refund.customer_id
+                ),
+                "order_id": (
+                    existing_refund.order_id
+                ),
+                "conversation_id": existing_refund.conversation_id,
+                "reason": existing_refund.reason,
+                "status": existing_refund.status,
+
+                # Important:
+                # tells LangGraph that this was
+                # NOT a newly created refund.
+                "created": False,
+
+                "message": (
+                    "An active refund request "
+                    "already exists for this order."
+                ),
+            }
+
+        # -------------------------------------------------
+        # CREATE NEW REFUND
+        # -------------------------------------------------
+
+        refund_id = (
+            f"REF-{uuid.uuid4().hex[:6].upper()}"
+        )
 
         refund = RefundRequest(
             id=refund_id,
             customer_id=customer_id,
             order_id=order_id,
+            conversation_id=conversation_id,
             reason=reason,
             status="pending_approval",
         )
@@ -145,10 +218,14 @@ def request_refund(
         db.commit()
         db.refresh(refund)
 
+        # IMPORTANT:
+        # There must be a return here.
         return {
             "refund_id": refund.id,
             "customer_id": refund.customer_id,
             "order_id": refund.order_id,
+            "conversation_id": refund.conversation_id,
             "reason": refund.reason,
             "status": refund.status,
+            "created": True,
         }

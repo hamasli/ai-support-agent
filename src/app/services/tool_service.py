@@ -21,6 +21,7 @@ from src.app.tools.support_tools import (
 def execute_tool(
     name: str,
     arguments: dict,
+    conversation_id: str | None = None,
 ) -> dict:
 
     try:
@@ -48,6 +49,7 @@ def execute_tool(
                 customer_id=args.customer_id,
                 order_id=args.order_id,
                 reason=args.reason,
+                conversation_id=conversation_id,
             )
 
         if name == "escalate_to_human":

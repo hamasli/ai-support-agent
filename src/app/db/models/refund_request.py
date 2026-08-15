@@ -17,6 +17,11 @@ class RefundRequest(Base):
         nullable=False,
     )
 
+    conversation_id: Mapped[str | None] = mapped_column(
+        ForeignKey("conversations.id"),
+        nullable=True,
+    )
+
     order_id: Mapped[str] = mapped_column(
         ForeignKey("orders.id"),
         nullable=False,

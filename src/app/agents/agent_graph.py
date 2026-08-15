@@ -197,6 +197,19 @@ instructions = """
     - the issue cannot be handled with the available tools
     - escalation is clearly necessary
 
+    Use escalate_to_human when:
+    - the customer explicitly asks for a human
+    - the issue genuinely requires human action that cannot be handled
+    with the available tools
+
+    Do NOT offer or automatically use human escalation merely because:
+    - a refund has already been approved
+    - refund payment timing is unavailable
+    - the knowledge base does not specify a payment ETA
+
+    For an approved refund, explain the known status and stop unless
+    the customer explicitly asks for another supported action or a human.
+
     Do not automatically escalate after a human refund rejection.
 
     If the customer wants escalation after a refund rejection,
@@ -234,6 +247,17 @@ instructions = """
     - Do not describe it as still pending.
     - Do not claim that the refund payment itself has already been processed,
     transferred, credited, or completed unless a tool explicitly confirms that.
+
+
+    If the latest status is "approved":
+    - Treat the human-review/approval case as complete.
+    - Do not offer human escalation merely to ask about refund payment timing.
+    - Do not automatically create another ticket or perform another action.
+    - Do not ask whether the customer wants escalation unless they explicitly
+    request human assistance.
+    - Tell the customer that no further approval action is required.
+    - Do not promise when the money will arrive unless a tool or company
+    documentation explicitly provides that information.
 
     If the latest status is "rejected":
     - Clearly tell the customer that the refund request was rejected
@@ -570,7 +594,15 @@ def agent_node(
         # loaded from PostgreSQL.
         result["previous_response_id"] = None
 
-        return result;
+        # TEMPORARY DEBUG:
+        # Verify exactly what agent_node is returning
+        # to LangGraph.
+    print(
+        "[AGENT NODE RETURN]:",
+        result,
+    )
+
+    return result;
 
 
 def route_after_agent(
@@ -599,10 +631,17 @@ def route_after_agent(
         [],
     )
 
+    print(
+        "[ROUTE AFTER AGENT] pending_tool_calls:",
+        pending_calls,
+        )
+
     # No tools requested means the AI already
     # produced the final customer response.
     if not pending_calls:
         return END
+
+    
 
     # ALL tool calls go through tool_node first.
     #
@@ -629,6 +668,14 @@ def tool_node(
 
     # Refund calls that must be handled later.
     deferred_calls = []
+
+    print(
+    "[TOOL NODE] received:",
+    state.get(
+        "pending_tool_calls",
+        [],
+    ),
+    )
 
     for call in state[
         "pending_tool_calls"
@@ -746,7 +793,17 @@ def prepare_refund_node(
     result = execute_tool(
         name="request_refund",
         arguments=arguments,
-    )
+        conversation_id=state[
+            "conversation_id"
+    ],
+)
+    if result is None:
+        result = {
+            "error": (
+                "The refund tool returned "
+                "no result."
+            )
+        }
 
     print(
         "[REFUND PREPARED]:",
@@ -797,6 +854,46 @@ def prepare_refund_node(
         return {
             "refund_request": None,
             "model_input": existing_outputs,
+            "pending_tool_calls": [],
+        }
+    # -------------------------------------------------
+    # REFUND ALREADY EXISTS
+    # -------------------------------------------------
+
+    if result.get("created") is False:
+
+        existing_outputs = list(
+            state.get(
+                "model_input",
+                [],
+            )
+        )
+
+        # Return the existing refund information
+        # to the model instead of starting another
+        # human-review workflow.
+        existing_outputs.append(
+            {
+                "type": "function_call_output",
+                "call_id": refund_call[
+                    "call_id"
+                ],
+                "output": json.dumps(
+                    result
+                ),
+            }
+        )
+
+        return {
+            # No new refund was created, therefore
+            # there is nothing new to approve.
+            "refund_request": None,
+
+            # Give the existing refund status
+            # back to the AI.
+            "model_input": existing_outputs,
+
+            # This tool call is finished.
             "pending_tool_calls": [],
         }
 
@@ -1089,11 +1186,19 @@ def route_after_tool(
     Otherwise:
         return tool results to OpenAI.
     """
-
+     
     if state.get(
         "pending_tool_calls"
     ):
         return "prepare_refund_node"
+
+    print(
+    "[ROUTE AFTER TOOL] pending_tool_calls:",
+    state.get(
+        "pending_tool_calls",
+        [],
+    ),
+    )
 
     return "agent_node"
 
@@ -1251,9 +1356,18 @@ builder.add_edge(
 # send that result back to the AI.
 #
 # The AI then generates the final customer response.
+# After the human decision updates the refund
+# in PostgreSQL, build the final response
+# deterministically without another OpenAI call.
 builder.add_edge(
     "refund_decision_node",
-    "agent_node",
+    "refund_response_node",
+)
+
+# The refund workflow is now complete.
+builder.add_edge(
+    "refund_response_node",
+    END,
 )
 
 

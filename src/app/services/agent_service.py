@@ -2,6 +2,7 @@ from langgraph.checkpoint.postgres import PostgresSaver
 
 from src.app.agents.agent_graph import build_agent_graph
 from src.app.core.config import settings
+from langgraph.types import Command
 from src.app.services.conversation_service import (
     get_conversation_messages,
 )
@@ -24,6 +25,94 @@ checkpoint_db_url = str(
     "postgresql+psycopg://",
     "postgresql://",
 )
+
+
+def get_pending_refund_review(
+    conversation_id: str,
+) -> dict | None:
+    """
+    Check whether this LangGraph conversation
+    is currently paused waiting for human
+    refund approval/rejection.
+    """
+
+    config = {
+        "configurable": {
+            "thread_id": conversation_id,
+        }
+    }
+
+    with PostgresSaver.from_conn_string(
+        checkpoint_db_url
+    ) as checkpointer:
+
+        agent_graph = build_agent_graph(
+            checkpointer=checkpointer,
+        )
+
+        snapshot = agent_graph.get_state(
+            config
+        )
+
+        # No saved state for this conversation.
+        if not snapshot.values:
+            return None
+
+        pending_refund = snapshot.values.get(
+            "refund_request"
+        )
+
+        # If refund_request still exists,
+        # the refund workflow has not finished yet.
+        if pending_refund:
+            return pending_refund
+
+    return None
+
+def get_pending_refund_review(
+    conversation_id: str,
+) -> dict | None:
+    """
+    Check whether this LangGraph conversation
+    currently has a refund waiting for
+    human approval/rejection.
+    """
+
+    config = {
+        "configurable": {
+            "thread_id": conversation_id,
+        }
+    }
+
+    with PostgresSaver.from_conn_string(
+        checkpoint_db_url
+    ) as checkpointer:
+
+        checkpointer.setup()
+        agent_graph = build_agent_graph(
+            checkpointer=checkpointer,
+        )
+        
+
+        
+
+        snapshot = agent_graph.get_state(
+            config
+        )
+
+        # No LangGraph state exists yet.
+        if not snapshot.values:
+            return None
+
+        pending_refund = snapshot.values.get(
+            "refund_request"
+        )
+
+        if pending_refund:
+            return pending_refund
+
+    return None
+
 
 
 def run_agent_turn(
@@ -143,6 +232,93 @@ def run_agent_turn(
         # Run this user turn.
         result = agent_graph.invoke(
             state,
+            config=config,
+        )
+        # TEMPORARY DEBUG:
+        # Show exactly what LangGraph returns when the
+        # workflow pauses for human refund approval.
+        print("\n================================")
+        print("LANGGRAPH RESULT TYPE")
+        print("================================")
+        print(type(result))
+
+        print("\n================================")
+        print("LANGGRAPH RESULT")
+        print("================================")
+        print(result)
+
+    return result
+
+def resume_refund_review(
+    conversation_id: str,
+    refund_id: str,
+    approved: bool,
+) -> dict:
+    """
+    Resume a refund workflow that is paused
+    waiting for human approval/rejection.
+
+    Before resuming, verify that the refund ID
+    belongs to the pending workflow.
+    """
+
+    config = {
+        "configurable": {
+            "thread_id": conversation_id,
+        },
+        "recursion_limit": 10,
+    }
+
+    with PostgresSaver.from_conn_string(
+        checkpoint_db_url
+    ) as checkpointer:
+
+        checkpointer.setup()
+        # Compile the graph using the same
+        # persistent PostgreSQL checkpoints.
+        agent_graph = build_agent_graph(
+            checkpointer=checkpointer,
+        )
+
+        
+
+        snapshot = agent_graph.get_state(
+            config
+        )
+
+        pending_refund = snapshot.values.get(
+            "refund_request"
+        )
+
+        # There must actually be a refund waiting
+        # for human review in this conversation.
+        if not pending_refund:
+            raise ValueError(
+                "No pending refund review was found "
+                "for this conversation."
+            )
+
+        # Protect against someone submitting a refund ID
+        # that belongs to another workflow.
+        if (
+            pending_refund.get("refund_id")
+            != refund_id
+        ):
+            raise ValueError(
+                "Refund ID does not match the pending "
+                "refund for this conversation."
+            )
+
+        # -------------------------------------------------
+        # RESUME interrupt()
+        # -------------------------------------------------
+
+        result = agent_graph.invoke(
+            Command(
+                resume={
+                    "approved": approved,
+                }
+            ),
             config=config,
         )
 

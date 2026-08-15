@@ -70,6 +70,11 @@ from src.app.schemas.chat import (
     ChatResponse,
 )
 
+from src.app.services.agent_service import (
+    get_pending_refund_review,
+    run_agent_turn,
+)
+
 # IMPORTANT:
 # /chat now uses our LangGraph agent instead
 # of the old manual generate_ai_reply() loop.
@@ -81,6 +86,11 @@ from src.app.services.conversation_service import (
     conversation_exists,
     create_conversation,
     save_message,
+)
+
+from src.app.services.agent_service import (
+    get_pending_refund_review,
+    run_agent_turn,
 )
 
 
@@ -126,6 +136,29 @@ def chat(
             status_code=404,
             detail="Conversation not found.",
         )
+    # -------------------------------------------------
+    # CHECK FOR PENDING HUMAN REVIEW
+    # -------------------------------------------------
+
+    pending_refund = get_pending_refund_review(
+        conversation_id=conversation_id,
+    )
+
+    if pending_refund:
+
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": (
+                    "This conversation has a refund "
+                    "waiting for human review."
+                ),
+                "refund_id": pending_refund.get(
+                    "refund_id"
+                ),
+                "status": "pending_approval",
+            },
+        )
 
     # -------------------------------------------------
     # SAVE USER MESSAGE
@@ -137,6 +170,30 @@ def chat(
     # agent_service.py will load conversation
     # history from PostgreSQL, including this
     # newest message.
+
+    # -------------------------------------------------
+    # CHECK FOR PENDING HUMAN REVIEW
+    # -------------------------------------------------
+
+    pending_refund = get_pending_refund_review(
+        conversation_id=conversation_id,
+    )
+
+    if pending_refund:
+
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": (
+                    "This conversation has a refund "
+                    "waiting for human review."
+                ),
+                "refund_id": pending_refund.get(
+                    "refund_id"
+                ),
+                "status": "pending_approval",
+            },
+        )
     save_message(
         conversation_id=conversation_id,
         role="user",
@@ -216,10 +273,11 @@ def chat(
                 )
 
                 return ChatResponse(
-                    conversation_id=(
-                        conversation_id
-                    ),
+                    conversation_id=conversation_id,
                     reply=reply,
+                    status="pending_human_review",
+                    requires_human_review=True,
+                    data={},
                 )
 
             # Safety fallback in case another type
@@ -262,10 +320,15 @@ def chat(
         )
 
         return ChatResponse(
-            conversation_id=(
-                conversation_id
-            ),
+            conversation_id=conversation_id,
             reply=reply,
+
+            # LangGraph finished normally.
+            status="completed",
+
+            requires_human_review=False,
+
+            data={},
         )
 
    
