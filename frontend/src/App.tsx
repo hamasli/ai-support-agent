@@ -1,19 +1,31 @@
+
 import {
   Bot,
+  Check,
+  CheckCircle2,
+  Copy,
   Menu,
   MessageSquare,
   Plus,
   Send,
+  ShieldCheck,
+  XCircle,
 } from "lucide-react";
 import {
-  FormEvent,
   useEffect,
+  useRef,
   useState,
+} from "react";
+
+import type {
+  FormEvent,
+  KeyboardEvent,
 } from "react";
 
 import {
   getConversationMessages,
   getConversations,
+  reviewRefund,
   sendChatMessage,
 } from "./services/api";
 
@@ -21,6 +33,9 @@ import type {
   Conversation,
   Message,
 } from "./types/chat";
+
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 
 function App() {
@@ -44,6 +59,16 @@ function App() {
     useState(true);
 
 
+  const [error, setError] =
+    useState<string | null>(null);
+
+  const [copiedMessageId, setCopiedMessageId] =
+    useState<string | null>(null);
+
+  const messagesEndRef =
+    useRef<HTMLDivElement | null>(null);
+
+
   // -------------------------------------------------------
   // LOAD CONVERSATIONS
   // -------------------------------------------------------
@@ -55,7 +80,11 @@ function App() {
 
       setConversations(data);
     } catch (error) {
-      console.error(error);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Unable to load conversations."
+      );
     }
   }
 
@@ -65,13 +94,20 @@ function App() {
   }, []);
 
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+    });
+  }, [messages, isSending]);
+
   // -------------------------------------------------------
   // OPEN OLD CONVERSATION
   // -------------------------------------------------------
-
   async function openConversation(
     conversationId: string
   ) {
+    setError(null);
+
     try {
       const data =
         await getConversationMessages(
@@ -84,7 +120,11 @@ function App() {
 
       setMessages(data.messages);
     } catch (error) {
-      console.error(error);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Unable to load conversation."
+      );
     }
   }
 
@@ -97,6 +137,8 @@ function App() {
     setActiveConversationId(null);
     setMessages([]);
     setInput("");
+    setError(null);
+    setPendingRefund(null);
   }
 
 
@@ -114,7 +156,7 @@ function App() {
     if (!cleanMessage || isSending) {
       return;
     }
-
+    setError(null);
     const temporaryUserMessage: Message = {
       id: `temp-${Date.now()}`,
       role: "user",
@@ -136,8 +178,19 @@ function App() {
         await sendChatMessage(
           cleanMessage,
           activeConversationId ??
-            undefined
+          undefined
         );
+      if (
+        result.status === "pending_human_review" &&
+        result.requires_human_review &&
+        result.data.refund_id
+      ) {
+        setPendingRefund({
+          refundId: result.data.refund_id,
+          conversationId:
+            result.conversation_id,
+        });
+      }
 
       const assistantMessage: Message = {
         id: `assistant-${Date.now()}`,
@@ -157,14 +210,99 @@ function App() {
       );
 
       await loadConversations();
-    } catch (error) {
-      console.error(error);
+    }
+    catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong. Please try again."
+      );
     } finally {
       setIsSending(false);
     }
   }
+  function handleKeyDown(
+    event: KeyboardEvent<HTMLTextAreaElement>
+  ) {
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey
+    ) {
+      event.preventDefault();
 
+      event.currentTarget.form?.requestSubmit();
+    }
+  }
+  function formatTime(date: string) {
+    return new Date(date).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+  const [pendingRefund, setPendingRefund] =
+    useState<{
+      refundId: string;
+      conversationId: string;
+    } | null>(null);
 
+  const [isReviewing, setIsReviewing] =
+    useState(false);
+
+  async function copyMessage(
+    messageId: string,
+    content: string
+  ) {
+    await navigator.clipboard.writeText(content);
+
+    setCopiedMessageId(messageId);
+
+    setTimeout(() => {
+      setCopiedMessageId(null);
+    }, 1500);
+  }
+  async function handleRefundReview(
+    approved: boolean
+  ) {
+    if (!pendingRefund || isReviewing) {
+      return;
+    }
+
+    setError(null);
+    setIsReviewing(true);
+
+    try {
+      const result = await reviewRefund(
+        pendingRefund.refundId,
+        pendingRefund.conversationId,
+        approved
+      );
+
+      const reviewMessage: Message = {
+        id: `review-${Date.now()}`,
+        role: "assistant",
+        content: result.reply,
+        created_at:
+          new Date().toISOString(),
+      };
+
+      setMessages((current) => [
+        ...current,
+        reviewMessage,
+      ]);
+
+      setPendingRefund(null);
+
+      await loadConversations();
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Unable to review refund."
+      );
+    } finally {
+      setIsReviewing(false);
+    }
+  }
   return (
     <div className="flex h-screen overflow-hidden bg-white text-zinc-900">
 
@@ -174,10 +312,9 @@ function App() {
           flex-shrink-0 border-r border-zinc-200
           bg-zinc-950 text-white
           transition-all duration-300
-          ${
-            sidebarOpen
-              ? "w-72"
-              : "w-0 overflow-hidden"
+          ${sidebarOpen
+            ? "w-72"
+            : "w-0 overflow-hidden"
           }
         `}
       >
@@ -231,11 +368,10 @@ function App() {
                       px-3 py-3 text-left
                       text-sm transition
 
-                      ${
-                        activeConversationId ===
+                      ${activeConversationId ===
                         conversation.conversation_id
-                          ? "bg-zinc-800 text-white"
-                          : "text-zinc-300 hover:bg-zinc-900"
+                        ? "bg-zinc-800 text-white"
+                        : "text-zinc-300 hover:bg-zinc-900"
                       }
                     `}
                   >
@@ -363,24 +499,25 @@ function App() {
                 <div
                   key={message.id}
                   className={`
-                    mb-7 flex
-                    ${
-                      message.role === "user"
-                        ? "justify-end"
-                        : "justify-start"
+      mb-8 flex
+      ${message.role === "user"
+                      ? "justify-end"
+                      : "justify-start"
                     }
-                  `}
+    `}
                 >
 
-                  {message.role ===
-                    "assistant" && (
-                    <div className="
-                      mr-3 mt-1 flex
-                      h-8 w-8 shrink-0
-                      items-center justify-center
-                      rounded-lg bg-zinc-950
-                      text-white
-                    ">
+                  {/* ASSISTANT ICON */}
+                  {message.role === "assistant" && (
+                    <div
+                      className="
+          mr-3 mt-1 flex
+          h-8 w-8 shrink-0
+          items-center justify-center
+          rounded-lg bg-zinc-950
+          text-white
+        "
+                    >
                       <Bot size={17} />
                     </div>
                   )}
@@ -388,48 +525,258 @@ function App() {
 
                   <div
                     className={`
-                      max-w-[80%]
-                      whitespace-pre-wrap
-                      text-sm leading-6
-
-                      ${
-                        message.role ===
-                        "user"
-                          ? `
-                            rounded-2xl
-                            rounded-br-md
-                            bg-zinc-100
-                            px-4 py-2.5
-                          `
-                          : "py-1"
+        group
+        ${message.role === "user"
+                        ? "max-w-[75%]"
+                        : "max-w-[88%]"
                       }
-                    `}
+      `}
                   >
-                    {message.content}
-                  </div>
 
+                    {/* MESSAGE */}
+                    {message.role === "user" ? (
+                      <div
+                        className="
+            whitespace-pre-wrap
+            rounded-2xl rounded-br-md
+            bg-zinc-100
+            px-4 py-2.5
+            text-sm leading-6
+          "
+                      >
+                        {message.content}
+                      </div>
+                    ) : (
+                      <div
+                        className="
+            assistant-markdown
+            text-sm leading-7
+            text-zinc-800
+          "
+                      >
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                        >
+                          {message.content}
+                        </ReactMarkdown>
+                      </div>
+                    )}
+
+
+                    {/* MESSAGE ACTIONS */}
+                    <div
+                      className={`
+          mt-2 flex items-center gap-2
+          text-xs text-zinc-400
+
+          ${message.role === "user"
+                          ? "justify-end"
+                          : "justify-start"
+                        }
+        `}
+                    >
+
+                      <span>
+                        {formatTime(message.created_at)}
+                      </span>
+
+
+                      {message.role === "assistant" && (
+                        <button
+                          onClick={() =>
+                            copyMessage(
+                              message.id,
+                              message.content
+                            )
+                          }
+                          title="Copy response"
+                          className="
+              flex items-center gap-1
+              rounded-md px-1.5 py-1
+              transition
+              hover:bg-zinc-100
+              hover:text-zinc-700
+            "
+                        >
+                          {copiedMessageId ===
+                            message.id ? (
+                            <>
+                              <Check size={13} />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={13} />
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      )}
+
+                    </div>
+
+                  </div>
                 </div>
               ))}
 
+              {pendingRefund && (
+                <div
+                  className="
+      mb-8 ml-11
+      max-w-xl
+      overflow-hidden
+      rounded-2xl
+      border border-amber-200
+      bg-amber-50
+    "
+                >
 
+                  <div
+                    className="
+        flex items-center gap-3
+        border-b border-amber-200
+        px-5 py-4
+      "
+                  >
+                    <div
+                      className="
+          flex h-9 w-9
+          items-center justify-center
+          rounded-xl
+          bg-amber-100
+          text-amber-700
+        "
+                    >
+                      <ShieldCheck size={19} />
+                    </div>
+
+                    <div>
+                      <div className="font-semibold text-zinc-900">
+                        Human Review Required
+                      </div>
+
+                      <div className="text-xs text-zinc-500">
+                        Reviewer Mode
+                      </div>
+                    </div>
+                  </div>
+
+
+                  <div className="px-5 py-4">
+
+                    <div className="mb-4 text-sm text-zinc-600">
+                      This refund request is paused
+                      until a human reviewer makes a
+                      decision.
+                    </div>
+
+
+                    <div
+                      className="
+          mb-5 rounded-xl
+          bg-white
+          px-4 py-3
+          text-sm
+        "
+                    >
+                      <div className="text-xs text-zinc-500">
+                        Refund ID
+                      </div>
+
+                      <div className="mt-1 font-mono font-medium text-zinc-900">
+                        {pendingRefund.refundId}
+                      </div>
+                    </div>
+
+
+                    <div className="flex gap-3">
+
+                      <button
+                        disabled={isReviewing}
+                        onClick={() =>
+                          handleRefundReview(false)
+                        }
+                        className="
+            flex flex-1 items-center
+            justify-center gap-2
+            rounded-xl
+            border border-red-200
+            bg-white
+            px-4 py-2.5
+            text-sm font-medium
+            text-red-700
+            transition
+            hover:bg-red-50
+            disabled:cursor-not-allowed
+            disabled:opacity-50
+          "
+                      >
+                        <XCircle size={17} />
+                        Reject
+                      </button>
+
+
+                      <button
+                        disabled={isReviewing}
+                        onClick={() =>
+                          handleRefundReview(true)
+                        }
+                        className="
+            flex flex-1 items-center
+            justify-center gap-2
+            rounded-xl
+            bg-zinc-950
+            px-4 py-2.5
+            text-sm font-medium
+            text-white
+            transition
+            hover:bg-zinc-800
+            disabled:cursor-not-allowed
+            disabled:opacity-50
+          "
+                      >
+                        <CheckCircle2 size={17} />
+
+                        {isReviewing
+                          ? "Processing..."
+                          : "Approve"}
+                      </button>
+
+                    </div>
+
+                  </div>
+                </div>
+              )}
               {isSending && (
-                <div className="flex items-center gap-3 text-sm text-zinc-500">
+                <div className="flex items-center gap-3">
 
-                  <div className="
-                    flex h-8 w-8
-                    items-center justify-center
-                    rounded-lg bg-zinc-950
-                    text-white
-                  ">
+                  <div
+                    className="
+        flex h-8 w-8
+        items-center justify-center
+        rounded-lg bg-zinc-950
+        text-white
+      "
+                  >
                     <Bot size={17} />
                   </div>
 
-                  <span>
-                    Thinking...
-                  </span>
+
+                  <div
+                    className="
+        flex items-center gap-1
+        rounded-xl bg-zinc-100
+        px-4 py-3
+      "
+                  >
+                    <span className="thinking-dot" />
+                    <span className="thinking-dot" />
+                    <span className="thinking-dot" />
+                  </div>
 
                 </div>
               )}
+              <div ref={messagesEndRef} />
 
             </div>
           )}
@@ -443,6 +790,19 @@ function App() {
           bg-white px-4
           pb-5 pt-3
         ">
+          {error && (
+            <div
+              className="
+      mx-auto mb-3 max-w-3xl
+      rounded-xl border border-red-200
+      bg-red-50
+      px-4 py-3
+      text-sm text-red-700
+    "
+            >
+              {error}
+            </div>
+          )}
 
           <form
             onSubmit={handleSubmit}
@@ -460,11 +820,13 @@ function App() {
 
             <textarea
               value={input}
+
               onChange={(event) =>
                 setInput(
                   event.target.value
                 )
               }
+              onKeyDown={handleKeyDown}
               placeholder="Ask a support question..."
               rows={1}
               className="
@@ -474,6 +836,7 @@ function App() {
                 px-3 py-2.5
                 text-sm outline-none
                 placeholder:text-zinc-400
+
               "
             />
 

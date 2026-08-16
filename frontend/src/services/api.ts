@@ -1,8 +1,10 @@
+
 import type {
-    ChatResponse,
-    Conversation,
-    ConversationMessagesResponse,
-  } from "../types/chat";
+  ChatResponse,
+  Conversation,
+  ConversationMessagesResponse,
+  RefundReviewResponse,
+} from "../types/chat";
   
   
   const API_BASE_URL = "http://localhost:8001";
@@ -67,6 +69,41 @@ import type {
       throw new Error(
         error.detail ??
           "Failed to send message."
+      );
+    }
+  
+    return response.json();
+  }
+
+
+  export async function reviewRefund(
+    refundId: string,
+    conversationId: string,
+    approved: boolean
+  ): Promise<RefundReviewResponse> {
+  
+    const response = await fetch(
+      `${API_BASE_URL}/refunds/${refundId}/review`,
+      {
+        method: "POST",
+  
+        headers: {
+          "Content-Type": "application/json",
+        },
+  
+        body: JSON.stringify({
+          conversation_id: conversationId,
+          approved,
+        }),
+      }
+    );
+  
+    if (!response.ok) {
+      const error = await response.json();
+  
+      throw new Error(
+        error.detail ??
+          "Failed to review refund."
       );
     }
   
