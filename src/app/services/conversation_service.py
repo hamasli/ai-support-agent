@@ -1,7 +1,7 @@
 # this file is storing the conversion between the user and the AI.
 
 import uuid
-
+from datetime import datetime
 from src.app.db.models.conversation import Conversation
 from src.app.db.models.message import Message
 from src.app.db.models.tool_call import ToolCall
@@ -91,3 +91,118 @@ def get_conversation_messages(
         }
         for message in messages
     ]
+
+def list_conversations() -> list[dict]:
+    """
+    Return conversations for the frontend sidebar.
+
+    The first user message is used as the
+    conversation title.
+    """
+
+    with SessionLocal() as db:
+
+        conversations = db.scalars(
+            select(Conversation)
+        ).all()
+
+        result = []
+
+        for conversation in conversations:
+
+            # First user message = sidebar title
+            first_message = db.scalar(
+                select(Message)
+                .where(
+                    Message.conversation_id
+                    == conversation.id,
+                    Message.role == "user",
+                )
+                .order_by(
+                    Message.created_at.asc()
+                )
+                .limit(1)
+            )
+
+            # Latest message = sorting/sidebar activity
+            latest_message = db.scalar(
+                select(Message)
+                .where(
+                    Message.conversation_id
+                    == conversation.id
+                )
+                .order_by(
+                    Message.created_at.desc()
+                )
+                .limit(1)
+            )
+
+            if first_message:
+                title = first_message.content
+
+                # Keep sidebar titles short.
+                if len(title) > 45:
+                    title = title[:45] + "..."
+            else:
+                title = "New conversation"
+
+            result.append(
+                {
+                    "conversation_id":
+                        conversation.id,
+
+                    "title":
+                        title,
+
+                    "updated_at":
+                        (
+                            latest_message.created_at
+                            if latest_message
+                            else None
+                        ),
+                }
+            )
+
+        # Newest conversations first.
+        result.sort(
+            key=lambda item: (
+                item["updated_at"]
+                or datetime.min
+            ),
+            reverse=True,
+        )
+
+        return result
+
+
+def get_conversation_messages_for_ui(
+    conversation_id: str,
+) -> list[dict]:
+    """
+    Return full conversation history
+    for the frontend.
+    """
+
+    with SessionLocal() as db:
+
+        messages = db.scalars(
+            select(Message)
+            .where(
+                Message.conversation_id
+                == conversation_id
+            )
+            .order_by(
+                Message.created_at.asc()
+            )
+        ).all()
+
+        return [
+            {
+                "id": message.id,
+                "role": message.role,
+                "content": message.content,
+                "created_at":
+                    message.created_at,
+            }
+            for message in messages
+        ]

@@ -7,6 +7,12 @@ from src.app.api.routes.knowledge import router as knowledge_router;
 # Import the refund router directly from refunds.py.
 # Import the refund router directly from refunds.py.
 from src.app.api.routes.refunds import router as refund_router;
+from src.app.api.routes.conversations import (
+    router as conversations_router,
+)
+
+from fastapi.middleware.cors import CORSMiddleware
+
 
 
 app = FastAPI(
@@ -21,4 +27,18 @@ app.include_router(knowledge_router);
 # Human review endpoint for refund HITL workflows.
 app.include_router(
     refund_router
+)
+app.include_router(
+    conversations_router
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
