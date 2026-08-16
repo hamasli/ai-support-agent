@@ -277,7 +277,10 @@ def chat(
                     reply=reply,
                     status="pending_human_review",
                     requires_human_review=True,
-                    data={},
+                    data={
+                    "refund_id": refund_id,
+                    "refund_status": "pending_approval",
+                },
                 )
 
             # Safety fallback in case another type
