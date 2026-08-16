@@ -19,7 +19,8 @@ dependencies = [
     "langgraph",
     "psycopg[binary,pool]",
     "langgraph-checkpoint-postgres>=3.1.2",
-    "pytest"
+    "pytest",
+    "docker",
 ]
 
 [tool.pytest.ini_options]

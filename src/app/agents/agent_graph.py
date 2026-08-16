@@ -425,6 +425,31 @@ instructions = """
 
     Always base the final answer on the latest tool results and
     human-review result available in the current workflow.
+
+
+
+    # ---------------------------------------------------------
+    # IDENTIFIER FORMAT
+    # ---------------------------------------------------------
+
+    Valid customer IDs use this format:
+    CUST- followed by exactly 3 digits.
+    Example: CUST-902.
+
+    Valid order IDs use this format:
+    ORD- followed by exactly 4 digits.
+    Example: ORD-9005.
+
+    If an identifier does not match the required format:
+    - clearly tell the customer that the ID format is invalid
+    - show the expected format
+    - ask them to verify the ID
+
+    If the identifier has a valid format but get_order_status returns
+    found=false:
+    - say that no matching order was found
+    - do not describe the format as invalid
+    - ask the customer to verify the ID
     """
 
 # ask agent what to do next, either direct answer or use tools .

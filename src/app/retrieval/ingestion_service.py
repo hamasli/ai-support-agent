@@ -42,3 +42,44 @@ def ingest_webpage(url: str) -> int:
         db.commit()
 
     return len(chunks)
+
+
+
+def ingest_text_document(
+    title: str,
+    text: str,
+    source_url: str,
+) -> int:
+    """
+    Ingest an internal company document
+    instead of downloading a webpage.
+    """
+
+    chunks = split_into_chunks(text)
+
+    with SessionLocal() as db:
+
+        # Remove an older version of this document.
+        db.execute(
+            delete(KnowledgeChunk).where(
+                KnowledgeChunk.source_url == source_url
+            )
+        )
+
+        for index, chunk in enumerate(chunks):
+
+            embedding = create_embedding(chunk)
+
+            knowledge_chunk = KnowledgeChunk(
+                source_url=source_url,
+                title=title,
+                chunk_index=index,
+                content=chunk,
+                embedding=embedding,
+            )
+
+            db.add(knowledge_chunk)
+
+        db.commit()
+
+    return len(chunks)

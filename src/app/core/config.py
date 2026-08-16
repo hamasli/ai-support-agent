@@ -8,6 +8,9 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         )
     database_url: str
+    langsmith_tracing: bool = False
+    langsmith_api_key: str | None = None
+    langsmith_project: str = "ai-support-agent"
 
 
 
