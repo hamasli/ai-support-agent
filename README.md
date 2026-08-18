@@ -7,12 +7,26 @@ The backend is implemented with FastAPI and LangGraph. The agent uses the OpenAI
 The project focuses on four practical AI-engineering concerns: reliable tool use, retrieval-augmented generation, persistent agent state, and human-in-the-loop execution.
 
 ## Demo
+This short demo shows the refund workflow from the customer request through human review and final approval.
 
-The demo is intentionally placed at the beginning of the repository so the main workflows can be understood before reading the implementation details.
+[Watch the Human-in-the-Loop Refund Demo](docs/demo/refund-hitl-demo.mp4)
+
+The demo shows:
+
+- creation of a refund request
+- the refund entering `pending_approval`;
+- LangGraph pausing the workflow for human review;
+- the Reviewer Mode interface;
+- human approval of the request;
+- resumption of the workflow;
+- the final approved refund result.
+
+
+  
 [Watch the 2-minute project demo](docs/demo/final%20video.mp4)
 
 
-The demo covers:
+The full video  demo covers:
 
 - reopening persisted conversations;
 - retrieving company policy information through RAG;
