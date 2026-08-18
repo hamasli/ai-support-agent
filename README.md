@@ -12,7 +12,7 @@ The demo is intentionally placed at the beginning of the repository so the main 
 
 ![AI Support Agent demo preview](docs/demo/demo-preview.gif)
 
-[Watch the full 2-minute demo](ProjectDemo/Demo/ai-support-agent-demo.mp4)
+[Watch the full 2-minute demo](ProjectDemo/Demo/final video.mp4)
 
 The demo covers:
 
