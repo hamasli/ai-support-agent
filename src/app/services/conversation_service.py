@@ -1,5 +1,5 @@
 # this file is storing the conversion between the user and the AI.
-
+from src.app.db.models.refund_request import RefundRequest
 import uuid
 from datetime import datetime
 from src.app.db.models.conversation import Conversation
@@ -206,3 +206,27 @@ def get_conversation_messages_for_ui(
             }
             for message in messages
         ]
+
+
+def get_pending_refund_for_conversation(
+    conversation_id: str,
+) -> dict | None:
+    with SessionLocal() as db:
+        refund = db.scalar(
+            select(RefundRequest)
+            .where(
+                RefundRequest.conversation_id == conversation_id,
+                RefundRequest.status == "pending_approval",
+            )
+            .order_by(RefundRequest.created_at.desc())
+            .limit(1)
+        )
+
+        if refund is None:
+            return None
+
+        return {
+            "refund_id": refund.id,
+            "refund_status": refund.status,
+            "order_id": refund.order_id,
+        }

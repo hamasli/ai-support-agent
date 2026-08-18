@@ -7,7 +7,26 @@ import type {
 } from "../types/chat";
   
   
-  const API_BASE_URL = "http://localhost:8001";
+  const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  "http://localhost:8001";
+
+  async function getErrorMessage(
+    response: Response,
+    fallback: string
+  ): Promise<string> {
+    try {
+      const data = await response.json();
+  
+      if (typeof data.detail === "string") {
+        return data.detail;
+      }
+  
+      return fallback;
+    } catch {
+      return fallback;
+    }
+  }
   
   
   export async function getConversations(): Promise<Conversation[]> {
@@ -34,7 +53,10 @@ import type {
   
     if (!response.ok) {
       throw new Error(
-        "Failed to load conversation."
+        await getErrorMessage(
+          response,
+          "Unable to load conversations."
+        )
       );
     }
   
@@ -64,11 +86,11 @@ import type {
     );
   
     if (!response.ok) {
-      const error = await response.json();
-  
       throw new Error(
-        error.detail ??
-          "Failed to send message."
+        await getErrorMessage(
+          response,
+          "The AI service is currently unavailable. Please try again."
+        )
       );
     }
   
@@ -99,11 +121,11 @@ import type {
     );
   
     if (!response.ok) {
-      const error = await response.json();
-  
       throw new Error(
-        error.detail ??
-          "Failed to review refund."
+        await getErrorMessage(
+          response,
+          "Unable to review this refund right now."
+        )
       );
     }
   

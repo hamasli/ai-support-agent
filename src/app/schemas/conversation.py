@@ -8,6 +8,11 @@ class ConversationListItem(BaseModel):
     title: str
     updated_at: datetime | None = None
 
+class PendingRefund(BaseModel):
+    refund_id: str
+    refund_status: str
+    order_id: str | None = None
+
 
 class ConversationMessage(BaseModel):
     id: str
@@ -19,3 +24,4 @@ class ConversationMessage(BaseModel):
 class ConversationMessagesResponse(BaseModel):
     conversation_id: str
     messages: list[ConversationMessage]
+    pending_refund: PendingRefund | None = None

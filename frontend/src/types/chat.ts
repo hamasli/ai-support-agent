@@ -14,7 +14,9 @@ export interface Conversation {
   export interface ConversationMessagesResponse {
     conversation_id: string;
     messages: Message[];
+    pending_refund: PendingRefund | null;
   }
+  
   export interface ChatResponse {
     conversation_id: string;
     reply: string;
@@ -26,6 +28,12 @@ export interface Conversation {
       refund_status?: string;
       [key: string]: unknown;
     };
+  }
+
+  export interface PendingRefund {
+    refund_id: string;
+    refund_status: string;
+    order_id: string | null;
   }
   
   

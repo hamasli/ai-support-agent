@@ -4,12 +4,13 @@ from src.app.schemas.conversation import (
     ConversationListItem,
     ConversationMessagesResponse,
 )
+
 from src.app.services.conversation_service import (
     conversation_exists,
     get_conversation_messages_for_ui,
+    get_pending_refund_for_conversation,
     list_conversations,
 )
-
 
 router = APIRouter(
     prefix="/conversations",
@@ -56,13 +57,14 @@ def get_messages(
             detail="Conversation not found.",
         )
 
-    messages = (
-        get_conversation_messages_for_ui(
-            conversation_id
-        )
+    messages = get_conversation_messages_for_ui(conversation_id)
+
+    pending_refund = get_pending_refund_for_conversation(
+        conversation_id
     )
 
     return ConversationMessagesResponse(
         conversation_id=conversation_id,
         messages=messages,
+        pending_refund=pending_refund,
     )

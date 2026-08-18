@@ -10,6 +10,7 @@ import {
   Send,
   ShieldCheck,
   XCircle,
+  LoaderCircle,
 } from "lucide-react";
 import {
   useEffect,
@@ -34,11 +35,13 @@ import type {
   Message,
 } from "./types/chat";
 
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import AssistantMessageContent
+  from "./components/AssistantMessageContent";
 
 
 function App() {
+
+  
   const [conversations, setConversations] =
     useState<Conversation[]>([]);
 
@@ -68,6 +71,11 @@ function App() {
   const messagesEndRef =
     useRef<HTMLDivElement | null>(null);
 
+  const [pendingRefund, setPendingRefund] =
+    useState<{
+      refundId: string;
+      conversationId: string;
+    } | null>(null);
 
   // -------------------------------------------------------
   // LOAD CONVERSATIONS
@@ -91,6 +99,17 @@ function App() {
 
   useEffect(() => {
     loadConversations();
+
+    const savedConversationId =
+      localStorage.getItem(
+        "activeConversationId"
+      );
+
+    if (savedConversationId) {
+      openConversation(
+        savedConversationId
+      );
+    }
   }, []);
 
 
@@ -98,7 +117,13 @@ function App() {
     messagesEndRef.current?.scrollIntoView({
       behavior: "smooth",
     });
-  }, [messages, isSending]);
+  }, [messages, isSending, pendingRefund]);
+
+
+  const [
+    isLoadingConversation,
+    setIsLoadingConversation,
+  ] = useState(false);
 
   // -------------------------------------------------------
   // OPEN OLD CONVERSATION
@@ -107,24 +132,49 @@ function App() {
     conversationId: string
   ) {
     setError(null);
-
+    setIsLoadingConversation(true);
+  
     try {
       const data =
         await getConversationMessages(
           conversationId
         );
-
+  
       setActiveConversationId(
         conversationId
       );
-
+  
+      localStorage.setItem(
+        "activeConversationId",
+        conversationId
+      );
+  
       setMessages(data.messages);
+  
+      if (data.pending_refund) {
+        setPendingRefund({
+          refundId:
+            data.pending_refund.refund_id,
+          conversationId:
+            conversationId,
+        });
+      } else {
+        setPendingRefund(null);
+      }
+  
+      // Close sidebar automatically on phones
+      if (window.innerWidth < 768) {
+        setSidebarOpen(false);
+      }
+  
     } catch (error) {
       setError(
         error instanceof Error
           ? error.message
           : "Unable to load conversation."
       );
+    } finally {
+      setIsLoadingConversation(false);
     }
   }
 
@@ -136,9 +186,17 @@ function App() {
   function startNewChat() {
     setActiveConversationId(null);
     setMessages([]);
+    
     setInput("");
     setError(null);
     setPendingRefund(null);
+
+    localStorage.removeItem(
+      "activeConversationId"
+    );
+    if (window.innerWidth < 768) {
+      setSidebarOpen(false);
+    }
   }
 
 
@@ -153,7 +211,11 @@ function App() {
 
     const cleanMessage = input.trim();
 
-    if (!cleanMessage || isSending) {
+    if (
+      !cleanMessage ||
+      isSending ||
+      isLoadingConversation
+    ) {
       return;
     }
     setError(null);
@@ -209,6 +271,11 @@ function App() {
         result.conversation_id
       );
 
+      localStorage.setItem(
+        "activeConversationId",
+        result.conversation_id
+      );
+
       await loadConversations();
     }
     catch (error) {
@@ -239,11 +306,6 @@ function App() {
       minute: "2-digit",
     });
   }
-  const [pendingRefund, setPendingRefund] =
-    useState<{
-      refundId: string;
-      conversationId: string;
-    } | null>(null);
 
   const [isReviewing, setIsReviewing] =
     useState(false);
@@ -305,19 +367,57 @@ function App() {
   }
   return (
     <div className="flex h-screen overflow-hidden bg-white text-zinc-900">
-
+      {sidebarOpen && (
+  <button
+    type="button"
+    aria-label="Close sidebar"
+    onClick={() => setSidebarOpen(false)}
+    className="
+      fixed inset-0 z-30
+      bg-black/40
+      md:hidden
+    "
+  />
+)}
+      {sidebarOpen && (
+  <button
+    type="button"
+    aria-label="Close sidebar"
+    onClick={() =>
+      setSidebarOpen(false)
+    }
+    className="
+      fixed inset-0 z-30
+      bg-black/40
+      md:hidden
+    "
+  />
+)}
       {/* SIDEBAR */}
       <aside
-        className={`
-          flex-shrink-0 border-r border-zinc-200
-          bg-zinc-950 text-white
-          transition-all duration-300
-          ${sidebarOpen
-            ? "w-72"
-            : "w-0 overflow-hidden"
-          }
-        `}
-      >
+  className={`
+    fixed inset-y-0 left-0 z-40
+    w-72 flex-shrink-0
+    border-r border-zinc-800
+    bg-zinc-950 text-white
+    transition-all duration-300
+
+    md:relative
+    md:inset-auto
+    md:z-auto
+
+    ${
+      sidebarOpen
+        ? "translate-x-0 md:w-72"
+        : `
+          -translate-x-full
+          md:w-0
+          md:translate-x-0
+          md:overflow-hidden
+        `
+    }
+  `}
+>
         <div className="flex h-full flex-col">
 
           <div className="p-4">
@@ -454,7 +554,28 @@ function App() {
         {/* MESSAGES */}
         <section className="flex-1 overflow-y-auto">
 
-          {messages.length === 0 ? (
+        {isLoadingConversation ? (
+  <div
+    className="
+      flex h-full
+      items-center justify-center
+    "
+  >
+    <div
+      className="
+        flex items-center gap-3
+        text-sm text-zinc-500
+      "
+    >
+      <LoaderCircle
+        size={20}
+        className="animate-spin"
+      />
+
+      Loading conversation...
+    </div>
+  </div>
+) : messages.length === 0 ? ( (
             <div className="
               flex h-full items-center
               justify-center px-6
@@ -489,10 +610,11 @@ function App() {
 
               </div>
             </div>
-          ) : (
+          )) : (
             <div className="
-              mx-auto w-full max-w-3xl
-              px-5 py-8
+            mx-auto w-full max-w-3xl
+            px-3 py-6
+            sm:px-5 sm:py-8
             ">
 
               {messages.map((message) => (
@@ -527,8 +649,8 @@ function App() {
                     className={`
         group
         ${message.role === "user"
-                        ? "max-w-[75%]"
-                        : "max-w-[88%]"
+                        ? "max-w-[88%] max-w-[75%]"
+                        :  "max-w-[94%] sm:max-w-[88%]"
                       }
       `}
                   >
@@ -547,19 +669,9 @@ function App() {
                         {message.content}
                       </div>
                     ) : (
-                      <div
-                        className="
-            assistant-markdown
-            text-sm leading-7
-            text-zinc-800
-          "
-                      >
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                        >
-                          {message.content}
-                        </ReactMarkdown>
-                      </div>
+                      <AssistantMessageContent
+                        content={message.content}
+                      />
                     )}
 
 
@@ -747,6 +859,8 @@ function App() {
                   </div>
                 </div>
               )}
+              
+
               {isSending && (
                 <div className="flex items-center gap-3">
 
@@ -786,10 +900,11 @@ function App() {
 
         {/* INPUT */}
         <div className="
-          border-t border-zinc-100
-          bg-white px-4
-          pb-5 pt-3
-        ">
+  border-t border-zinc-100
+  bg-white
+  px-3 pb-3 pt-3
+  sm:px-4 sm:pb-5
+">
           {error && (
             <div
               className="
@@ -845,7 +960,8 @@ function App() {
               type="submit"
               disabled={
                 !input.trim() ||
-                isSending
+                isSending ||
+                isLoadingConversation
               }
               className="
                 flex h-10 w-10
