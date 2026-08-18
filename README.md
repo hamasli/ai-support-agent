@@ -9,8 +9,8 @@ The project focuses on four practical AI-engineering concerns: reliable tool use
 ## Demo
 
 The demo is intentionally placed at the beginning of the repository so the main workflows can be understood before reading the implementation details.
+[Watch the 2-minute project demo](docs/demo/final%20video.mp4)
 
-[Watch the 2-minute project demo](docs/demo/ai-support-agent-demo.mp4)
 
 The demo covers:
 
@@ -28,7 +28,7 @@ The demo covers:
 
 ## System Architecture
 
-![AI Support Agent System Architecture](docs/architecture.png)
+![AI Support Agent System Architecture](docs/Architecture_diagram.png)
 
 The application is divided into several clear layers.
 
