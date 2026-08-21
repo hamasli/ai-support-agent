@@ -110,10 +110,8 @@ def request_refund(
 
     with SessionLocal() as db:
 
-        # -------------------------------------------------
+        
         # VALIDATE CUSTOMER
-        # -------------------------------------------------
-
         customer = db.get(
             Customer,
             customer_id,
@@ -125,10 +123,8 @@ def request_refund(
                 "customer_id": customer_id,
             }
 
-        # -------------------------------------------------
+      
         # VALIDATE ORDER
-        # -------------------------------------------------
-
         order = db.get(
             Order,
             order_id,
@@ -148,10 +144,8 @@ def request_refund(
                 )
             }
 
-        # -------------------------------------------------
+        
         # DUPLICATE REFUND PROTECTION
-        # -------------------------------------------------
-
         existing_refund = db.scalar(
             select(RefundRequest)
             .where(
@@ -197,10 +191,8 @@ def request_refund(
                 ),
             }
 
-        # -------------------------------------------------
+       
         # CREATE NEW REFUND
-        # -------------------------------------------------
-
         refund_id = (
             f"REF-{uuid.uuid4().hex[:6].upper()}"
         )

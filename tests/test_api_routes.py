@@ -8,9 +8,9 @@ from src.app.api.routes import refunds
 client = TestClient(app)
 
 
-# ---------------------------------------------------------
+
 # CHAT API - INVALID CONVERSATION
-# ---------------------------------------------------------
+
 
 def test_chat_invalid_conversation_returns_404(
     monkeypatch,
@@ -43,9 +43,9 @@ def test_chat_invalid_conversation_returns_404(
     )
 
 
-# ---------------------------------------------------------
+
 # REFUND REVIEW API - SUCCESS
-# ---------------------------------------------------------
+
 
 def test_refund_review_endpoint_success(
     monkeypatch,

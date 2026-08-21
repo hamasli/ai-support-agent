@@ -8,17 +8,6 @@ from src.app.services.conversation_service import (
 )
 
 
-# ---------------------------------------------------------
-# LANGGRAPH POSTGRES DATABASE URL
-# ---------------------------------------------------------
-
-# SQLAlchemy uses:
-#
-# postgresql+psycopg://...
-#
-# LangGraph PostgresSaver expects:
-#
-# postgresql://...
 checkpoint_db_url = str(
     settings.database_url
 ).replace(
@@ -92,10 +81,7 @@ def get_pending_refund_review(
         agent_graph = build_agent_graph(
             checkpointer=checkpointer,
         )
-        
-
-        
-
+    
         snapshot = agent_graph.get_state(
             config
         )
@@ -114,7 +100,6 @@ def get_pending_refund_review(
     return None
 
 
-
 def run_agent_turn(
     conversation_id: str,
 ) -> dict:
@@ -126,23 +111,15 @@ def run_agent_turn(
     PostgreSQL before this function is called.
     """
 
-    # -----------------------------------------------------
     # LOAD CONVERSATION HISTORY
-    # -----------------------------------------------------
-
     # PostgreSQL remains our application-level
-    # conversation history.
-    #
-    # This includes the latest user message because
-    # /chat saves it before calling this function.
+     
     messages = get_conversation_messages(
         conversation_id=conversation_id,
     )
 
-    # -----------------------------------------------------
+   
     # NEW USER-TURN STATE
-    # -----------------------------------------------------
-
     state = {
         "conversation_id": conversation_id,
 
@@ -151,7 +128,6 @@ def run_agent_turn(
 
         # Start a fresh OpenAI response chain for this
         # new user turn.
-        #
         # Tool calls inside this same graph run may later
         # populate previous_response_id again.
         "previous_response_id": None,
@@ -168,34 +144,27 @@ def run_agent_turn(
          "final_response": "",
     }
 
-    # -----------------------------------------------------
+   
     # LANGGRAPH THREAD CONFIGURATION
-    # -----------------------------------------------------
-
+    
     # We use conversation_id as thread_id.
-    #
     # Therefore:
-    #
     # PostgreSQL conversation:
     # CONV-ABC123
-    #
     # LangGraph thread:
     # CONV-ABC123
-    #
     # Both refer to the same customer conversation.
     config = {
         "configurable": {
             "thread_id": conversation_id,
         },
 
-        # Protect the graph from accidentally running
         # forever because of repeated tool calls.
         "recursion_limit": 10,
     }
 
-    # -----------------------------------------------------
+  
     # RUN THE GRAPH WITH POSTGRES CHECKPOINTING
-    # -----------------------------------------------------
 
     # PostgresSaver persists LangGraph workflow state.
     #
@@ -218,11 +187,7 @@ def run_agent_turn(
         checkpoint_db_url
     ) as checkpointer:
 
-        # Safe to call while developing.
-        # This ensures the LangGraph checkpoint
-        # tables exist.
         checkpointer.setup()
-
         # Compile our real support graph with
         # persistent PostgreSQL checkpoints.
         agent_graph = build_agent_graph(
@@ -234,17 +199,6 @@ def run_agent_turn(
             state,
             config=config,
         )
-        # TEMPORARY DEBUG:
-        # Show exactly what LangGraph returns when the
-        # workflow pauses for human refund approval.
-        print("\n================================")
-        print("LANGGRAPH RESULT TYPE")
-        print("================================")
-        print(type(result))
-
-        print("\n================================")
-        print("LANGGRAPH RESULT")
-        print("================================")
         print(result)
 
     return result

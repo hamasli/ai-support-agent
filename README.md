@@ -21,12 +21,9 @@ The demo shows:
 - resumption of the workflow;
 - the final approved refund result.
 
+[Watch the project demo](docs/demo/final%20video.mp4)
 
-  
-[Watch the 2-minute project demo](docs/demo/final%20video.mp4)
-
-
-The full video  demo covers:
+The full demo video covers:
 
 - reopening persisted conversations;
 - retrieving company policy information through RAG;
@@ -38,7 +35,7 @@ The full video  demo covers:
 - approving or rejecting the refund from Reviewer Mode;
 - resuming the LangGraph workflow and displaying the final result.
 
-> The GIF is intended as a short automatically visible preview. The MP4 contains the full demonstration.
+
 
 ## System Architecture
 

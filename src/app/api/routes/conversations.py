@@ -17,10 +17,8 @@ router = APIRouter(
     tags=["Conversations"],
 )
 
-
-# ---------------------------------------------------------
 # LIST CONVERSATIONS
-# ---------------------------------------------------------
+
 
 @router.get(
     "",
@@ -34,9 +32,8 @@ def get_conversations():
     return list_conversations()
 
 
-# ---------------------------------------------------------
 # GET ONE CONVERSATION'S MESSAGES
-# ---------------------------------------------------------
+
 
 @router.get(
     "/{conversation_id}/messages",

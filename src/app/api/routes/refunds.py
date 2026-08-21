@@ -38,10 +38,8 @@ def review_refund(
         request.conversation_id
     )
 
-    # -------------------------------------------------
+    
     # VALIDATE CONVERSATION
-    # -------------------------------------------------
-
     if not conversation_exists(
         conversation_id
     ):
@@ -52,10 +50,7 @@ def review_refund(
 
     try:
 
-        # -------------------------------------------------
         # RESUME LANGGRAPH
-        # -------------------------------------------------
-
         result = resume_refund_review(
             conversation_id=conversation_id,
             refund_id=refund_id,
@@ -73,14 +68,11 @@ def review_refund(
             detail=str(error),
         )
 
-    # -------------------------------------------------
+    
     # GET DETERMINISTIC FINAL RESPONSE
-    # -------------------------------------------------
-
     reply = result.get(
         "final_response"
     )
-
     if not reply:
         raise HTTPException(
             status_code=500,
@@ -88,21 +80,7 @@ def review_refund(
                 "The refund review completed "
                 "without producing a response."
             ),
-        )
-
-    # -------------------------------------------------
-    # SAVE FINAL ASSISTANT MESSAGE
-    # -------------------------------------------------
-
-    # /chat already stored the earlier:
-    #
-    # "Refund is pending approval"
-    #
-    # Now we also store:
-    #
-    # "Refund approved"
-    # OR
-    # "Refund rejected"
+        )    
     save_message(
         conversation_id=conversation_id,
         role="assistant",

@@ -162,24 +162,17 @@ instructions = """
     tool results, actions, URLs, or capabilities.
 
 
-    # ---------------------------------------------------------
+    
     # ORDER STATUS
-    # ---------------------------------------------------------
+    
 
     Use get_order_status when the customer asks about:
     - an order status
     - delivery status
     - estimated delivery information available through the tool
-
     Never invent an order ID.
-
     If an order ID is required but missing, ask the customer for it.
-
-
-    # ---------------------------------------------------------
     # SUPPORT TICKETS
-    # ---------------------------------------------------------
-
     Use create_support_ticket when the customer explicitly wants
     a support ticket created.
 
@@ -187,11 +180,7 @@ instructions = """
 
     Ask for any required information that is missing.
 
-
-    # ---------------------------------------------------------
     # HUMAN ESCALATION
-    # ---------------------------------------------------------
-
     Use escalate_to_human when:
     - the customer explicitly asks for a human
     - the issue cannot be handled with the available tools
@@ -216,10 +205,8 @@ instructions = """
     wait for the customer to explicitly request it in a new turn.
 
 
-    # ---------------------------------------------------------
+   
     # REFUNDS
-    # ---------------------------------------------------------
-
     Use request_refund when the customer asks for a refund.
 
     The refund workflow works like this:
@@ -275,10 +262,7 @@ instructions = """
     available tool explicitly confirms completion.
 
 
-    # ---------------------------------------------------------
     # COMPANY KNOWLEDGE / RAG
-    # ---------------------------------------------------------
-
     Use search_knowledge_base for questions about:
     - company policies
     - returns
@@ -323,11 +307,7 @@ instructions = """
     If search_knowledge_base already returned useful evidence during
     the current user turn, do not repeat the same search unnecessarily.
 
-
-    # ---------------------------------------------------------
     # CONVERSATION HISTORY
-    # ---------------------------------------------------------
-
     Use relevant information already available in the conversation.
 
     If a required customer ID, order ID, or other value was clearly
@@ -335,11 +315,8 @@ instructions = """
 
     Do not invent missing identifiers.
 
-
-    # ---------------------------------------------------------
+   
     # AVAILABLE ACTIONS
-    # ---------------------------------------------------------
-
     Only claim to perform actions supported by the available tools.
 
     Available capabilities include:
@@ -366,11 +343,7 @@ instructions = """
 
     unless an available tool explicitly supports that capability.
 
-
-    # ---------------------------------------------------------
     # NOTIFICATIONS AND FUTURE ACTIONS
-    # ---------------------------------------------------------
-
     Do not promise that the customer will receive:
     - an email
     - a message
@@ -385,22 +358,15 @@ instructions = """
     "I'll add this to the case", or similar statements unless a tool
     actually performed that action.
 
-
-    # ---------------------------------------------------------
     # SCOPE
-    # ---------------------------------------------------------
 
     For questions unrelated to this company or customer support,
     do not answer using general knowledge.
 
     Politely explain that you can only assist with company
     customer-support matters.
-
-
-    # ---------------------------------------------------------
+    
     # RESPONSE STYLE
-    # ---------------------------------------------------------
-
     Keep responses concise, clear, and practical.
 
     For normal customer-support questions, generally stay within
@@ -428,10 +394,8 @@ instructions = """
 
 
 
-    # ---------------------------------------------------------
+   
     # IDENTIFIER FORMAT
-    # ---------------------------------------------------------
-
     Valid customer IDs use this format:
     CUST- followed by exactly 3 digits.
     Example: CUST-902.
@@ -495,28 +459,20 @@ def agent_node(
     Later model calls:
         Continue from previous_response_id and send
         only the new tool outputs.
-
     This avoids storing raw OpenAI response objects
     inside LangGraph checkpoints.
     """
 
     start = time.perf_counter()
 
-    # -------------------------------------------------
+    
     # CONTROL WHICH TOOLS THE MODEL CAN USE
-    # -------------------------------------------------
-
     # By default, the model can use all available tools.
     available_tools = tools
 
     # If a human already rejected the refund action,
     # the next model call should only explain the result.
-    #
-    # We do not want the model to automatically:
-    # - retry the refund
-    # - create a ticket
-    # - escalate
-    # - perform another action
+    
     if state.get("refund_tool_approved") is False:
         available_tools = []
 
@@ -526,9 +482,8 @@ def agent_node(
         "previous_response_id"
     )
 
-    # -------------------------------------------------
+   
     # FIRST OPENAI CALL
-    # -------------------------------------------------
     if not previous_response_id:
 
         response = client.responses.create(
@@ -538,15 +493,11 @@ def agent_node(
             input=state["messages"],
         )
     
-    # -------------------------------------------------
     # CONTINUE EXISTING OPENAI RESPONSE
-    # -------------------------------------------------
     else:
-
         # Continue the earlier OpenAI response.
-        #
         # previous_response_id keeps the model context
-        # without us storing raw response objects.
+       
         response = client.responses.create(
             model=settings.openai_model,
             instructions=instructions,
@@ -569,10 +520,7 @@ def agent_node(
         f"{elapsed:.2f}s"
     )
 
-    # -------------------------------------------------
     # FIND TOOL CALLS
-    # -------------------------------------------------
-
     # Extract any function/tool calls requested
     # by the model.
     function_calls = [
@@ -603,9 +551,9 @@ def agent_node(
         for item in function_calls
     ]
 
-    # -------------------------------------------------
+   
     # UPDATE LANGGRAPH STATE
-    # -------------------------------------------------
+    
 
     result = {
         # Save only the OpenAI response ID.
@@ -622,9 +570,7 @@ def agent_node(
     }
 
     # If no tool calls remain,
-    # we have the final assistant response.
-    # If no tool calls remain,
-    # we have the final assistant response.
+    # we have the final assistant response..
     if not function_calls:
 
         # Save the final assistant response.
@@ -632,17 +578,13 @@ def agent_node(
             response.output_text
         )
 
-        # The refund decision only belongs to
-        # the current workflow turn.
-        #
+        # The refund decision only belongs to the current workflow turn.
         # Reset it so a future user message
         # does not inherit the old approval/rejection.
         result["refund_tool_approved"] = None
 
         # IMPORTANT:
-        # This OpenAI response chain is now finished.
-        #
-        # A future /chat request should start a fresh
+        # This OpenAI response chain is now finished. A future /chat request should start a fresh
         # model call using the conversation history
         # loaded from PostgreSQL.
         result["previous_response_id"] = None
@@ -694,10 +636,7 @@ def route_after_agent(
     if not pending_calls:
         return END
 
-    
-
     # ALL tool calls go through tool_node first.
-    #
     # Normal tools execute there.
     # request_refund is deferred from tool_node
     # to prepare_refund_node.
@@ -709,9 +648,7 @@ def tool_node(
 ) -> dict:
     """
     Execute normal tools.
-
     Refund calls are NOT executed here.
-
     If request_refund is present, it is preserved
     so the dedicated refund workflow can handle it.
     """
@@ -734,43 +671,30 @@ def tool_node(
         "pending_tool_calls"
     ]:
 
-        # -------------------------------------------------
         # REFUND
-        # -------------------------------------------------
         if call["name"] == "request_refund":
-
             # Do not execute it here.
-            #
             # Send it to prepare_refund_node instead.
             deferred_calls.append(call)
-
             continue
 
-        # -------------------------------------------------
         # NORMAL TOOL
-        # -------------------------------------------------
-
         arguments = json.loads(
             call["arguments"]
         )
-
         start = time.perf_counter()
-
         result = execute_tool(
             name=call["name"],
             arguments=arguments,
         )
-
         elapsed = (
             time.perf_counter()
             - start
         )
-
         print(
             f"[TOOL] {call['name']}: "
             f"{elapsed:.2f}s"
         )
-
         # Save normal tool execution for auditing.
         save_tool_call(
             conversation_id=state[
@@ -797,9 +721,6 @@ def tool_node(
     return {
         # Normal tool outputs.
         "model_input": tool_outputs,
-
-        # Usually empty.
-        #
         # If a refund was requested,
         # it remains here for the next node.
         "pending_tool_calls": deferred_calls,
@@ -810,9 +731,7 @@ def prepare_refund_node(
 ) -> dict:
     """
     Create the refund request BEFORE human review.
-
     The database row is created with:
-
         status = pending_approval
 
     IMPORTANT:
@@ -838,7 +757,6 @@ def prepare_refund_node(
     )
 
     # Use the existing tool.
-    #
     # Your current request_refund already:
     # - validates customer/order
     # - creates the refund row
@@ -877,10 +795,8 @@ def prepare_refund_node(
         ),
     )
 
-    # -------------------------------------------------
+    
     # TOOL FAILED
-    # -------------------------------------------------
-
     if "error" in result:
 
         # If creating the refund failed,
@@ -909,12 +825,9 @@ def prepare_refund_node(
             "model_input": existing_outputs,
             "pending_tool_calls": [],
         }
-    # -------------------------------------------------
+    
     # REFUND ALREADY EXISTS
-    # -------------------------------------------------
-
     if result.get("created") is False:
-
         existing_outputs = list(
             state.get(
                 "model_input",
@@ -936,7 +849,6 @@ def prepare_refund_node(
                 ),
             }
         )
-
         return {
             # No new refund was created, therefore
             # there is nothing new to approve.
@@ -949,11 +861,7 @@ def prepare_refund_node(
             # This tool call is finished.
             "pending_tool_calls": [],
         }
-
-    # -------------------------------------------------
     # SUCCESS
-    # -------------------------------------------------
-
     # Save the pending refund information
     # into LangGraph state.
     return {
@@ -967,11 +875,9 @@ def route_after_refund_prepare(
     """
     Failed refund creation:
         go back to the agent.
-
     Successful pending refund:
         wait for human review.
     """
-
     if state.get(
         "refund_request"
     ) is None:
@@ -991,10 +897,8 @@ def refund_approval_node(
         "refund_request"
     ]
 
-    # -------------------------------------------------
+    
     # PAUSE HERE
-    # -------------------------------------------------
-
     human_decision = interrupt(
         {
             "type": "refund_approval",
@@ -1026,13 +930,7 @@ def refund_approval_node(
         }
     )
 
-    # Human sends:
-    #
-    # {"approved": True}
-    #
-    # or
-    #
-    # {"approved": False}
+    # Human sends:  {"approved": True}  or  {"approved": False}
     approved = bool(
         human_decision.get(
             "approved",
@@ -1090,7 +988,6 @@ def refund_decision_node(
 
 
     # Save the final database result in graph state.
-    #
     # The next node will use this directly
     # instead of asking the LLM to interpret it.
     return {
@@ -1120,22 +1017,15 @@ def refund_response_node(
     result = state.get(
         "refund_review_result"
     )
-
-    # ---------------------------------------------
     # SAFETY: RESULT MISSING
-    # ---------------------------------------------
-
     if not result:
-
         final_response = (
             "The refund review finished, but the "
             "final refund status could not be loaded."
         )
 
-    # ---------------------------------------------
+    
     # SAFETY: DATABASE/SERVICE ERROR
-    # ---------------------------------------------
-
     elif "error" in result:
 
         final_response = (
@@ -1144,7 +1034,6 @@ def refund_response_node(
         )
 
     else:
-
         # Read only trusted values returned
         # from our database/service.
         refund_id = result.get(
@@ -1159,12 +1048,9 @@ def refund_response_node(
             "status"
         )
 
-        # -----------------------------------------
+        
         # HUMAN APPROVED
-        # -----------------------------------------
-
         if status == "approved":
-
             final_response = (
                 "Your refund request has been approved.\n\n"
                 f"Refund ID: {refund_id}\n"
@@ -1175,12 +1061,8 @@ def refund_response_node(
                 "itself has already been completed."
             )
 
-        # -----------------------------------------
         # HUMAN REJECTED
-        # -----------------------------------------
-
         elif status == "rejected":
-
             final_response = (
                 "Your refund request was rejected by "
                 "the human reviewer.\n\n"
@@ -1190,23 +1072,14 @@ def refund_response_node(
                 "No additional action was taken automatically."
             )
 
-        # -----------------------------------------
+       
         # UNEXPECTED STATUS
-        # -----------------------------------------
-
-        else:
-
             final_response = (
                 "The refund review has finished.\n\n"
                 f"Refund ID: {refund_id}\n"
                 f"Order ID: {order_id}\n"
                 f"Status: {status}"
             )
-
-    # -------------------------------------------------
-    # CLEAN TEMPORARY REFUND STATE
-    # -------------------------------------------------
-
     return {
         # This is now the final response returned
         # by the LangGraph workflow.
@@ -1255,21 +1128,13 @@ def route_after_tool(
 
     return "agent_node"
 
-# ---------------------------------------------------------
-# BUILD THE LANGGRAPH
-# ---------------------------------------------------------
 
+# BUILD THE LANGGRAPH
 # Create a graph whose shared state is AgentState.
 builder = StateGraph(AgentState)
 
-
-# ---------------------------------------------------------
 # REGISTER NODES
-# ---------------------------------------------------------
-
 # Main AI/model node.
-# This decides whether to answer directly
-# or request one or more tools.
 builder.add_node(
     "agent_node",
     agent_node,
@@ -1281,7 +1146,6 @@ builder.add_node(
 # create_support_ticket
 # escalate_to_human
 # search_knowledge_base
-#
 # Refund calls are deferred to the special refund workflow.
 builder.add_node(
     "tool_node",
@@ -1306,11 +1170,7 @@ builder.add_node(
 
 
 # After the human decision,
-# updates the SAME refund row to:
-#
-# approved
-# OR
-# rejected
+# updates the SAME refund row to: approved  OR rejected
 builder.add_node(
     "refund_decision_node",
     refund_decision_node,
@@ -1324,26 +1184,17 @@ builder.add_node(
 )
 
 
-# ---------------------------------------------------------
 # START
-# ---------------------------------------------------------
-
 # Every new graph execution begins with the AI agent.
 builder.add_edge(
     START,
     "agent_node",
 )
 
-
-# ---------------------------------------------------------
 # AFTER AGENT NODE
-# ---------------------------------------------------------
-
 # route_after_agent decides:
-#
 # If tools were requested:
 #     -> tool_node
-#
 # If no tools were requested:
 #     -> END
 builder.add_conditional_edges(
@@ -1351,10 +1202,8 @@ builder.add_conditional_edges(
     route_after_agent,
 )
 
-
-# ---------------------------------------------------------
 # AFTER TOOL NODE
-# ---------------------------------------------------------
+
 
 # route_after_tool decides:
 #
@@ -1372,15 +1221,11 @@ builder.add_conditional_edges(
 )
 
 
-# ---------------------------------------------------------
-# AFTER REFUND IS CREATED
-# ---------------------------------------------------------
 
+# AFTER REFUND IS CREATED
 # route_after_refund_prepare decides:
-#
 # If refund creation failed:
 #     -> agent_node
-#
 # If refund was successfully created:
 #     -> refund_approval_node
 builder.add_conditional_edges(
@@ -1388,11 +1233,7 @@ builder.add_conditional_edges(
     route_after_refund_prepare,
 )
 
-
-# ---------------------------------------------------------
 # HUMAN APPROVAL / REJECTION
-# ---------------------------------------------------------
-
 # When the human resumes the graph,
 # continue to the node that updates the refund status.
 builder.add_edge(
@@ -1400,14 +1241,9 @@ builder.add_edge(
     "refund_decision_node",
 )
 
-
-# ---------------------------------------------------------
 # AFTER REFUND DECISION
-# ---------------------------------------------------------
-
 # Once the refund becomes approved/rejected,
 # send that result back to the AI.
-#
 # The AI then generates the final customer response.
 # After the human decision updates the refund
 # in PostgreSQL, build the final response
@@ -1424,29 +1260,19 @@ builder.add_edge(
 )
 
 
-# ---------------------------------------------------------
-# COMPILE GRAPH
-# ---------------------------------------------------------
-
 def build_agent_graph(
     checkpointer=None,
 ):
     """
     Compile the graph.
-
     A PostgreSQL checkpointer can be supplied
     so LangGraph can persist state and resume
     interrupted workflows.
     """
-
     return builder.compile(
         checkpointer=checkpointer,
     )
 
-
-# Default compiled graph.
-#
 # Our checkpoint test / production code can instead call:
-#
 # build_agent_graph(checkpointer=checkpointer)
 agent_graph = build_agent_graph()

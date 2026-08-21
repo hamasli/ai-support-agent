@@ -43,13 +43,8 @@ def update_refund_status(
                 "error": "Refund request not found.",
                 "refund_id": refund_id,
             }
-
-        # -------------------------------------------------
         # IDEMPOTENCY / SAFETY
-        # -------------------------------------------------
-        #
         # Only pending refunds can receive a new decision.
-        #
         # If this function accidentally runs twice,
         # we do not change an already-reviewed request.
         if refund.status != "pending_approval":
