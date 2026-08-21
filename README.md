@@ -6,6 +6,14 @@ The backend is implemented with FastAPI and LangGraph. The agent uses the OpenAI
 
 The project focuses on four practical AI-engineering concerns: reliable tool use, retrieval-augmented generation, persistent agent state, and human-in-the-loop execution.
 
+## 📸 Preview
+
+![Main Chat Interface](docs/screenshots/refund.png)
+
+*The main chat interface where users interact with the AI support agent.*
+
+
+
 ## Demo
 This short demo shows the refund workflow from the customer request through human review and final approval.
 
