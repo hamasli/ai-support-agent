@@ -4,12 +4,12 @@ services:
     image: pgvector/pgvector:pg18-trixie
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 1234
+      POSTGRES_PASSWORD: 726267
       POSTGRES_DB: ai_support_agent
     # Your Windows PostgreSQL already uses 5432,
     # so Docker exposes this database on 5433.
-    ports:
-      - "5433:5432"
+    # ports:
+    #   - "5433:5432"
 
     volumes:
        - postgres_data:/var/lib/postgresql
@@ -23,7 +23,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-
+    restart: always
 
   # FASTAPI APPLICATION
   api:
@@ -39,12 +39,12 @@ services:
       DATABASE_URL: postgresql+psycopg://postgres:1234@db:5432/ai_support_agent
 
     ports:
-      - "8001:8000"
+      - "8000:8000"
 
     depends_on:
       db:
         condition: service_healthy
-
+    restart: always
 
 
 # KEEP POSTGRES DATA AFTER CONTAINER RESTARTS

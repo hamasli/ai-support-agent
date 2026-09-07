@@ -10,7 +10,7 @@ from src.app.api.routes.refunds import router as refund_router;
 from src.app.api.routes.conversations import (
     router as conversations_router,
 )
-
+import os;
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -32,12 +32,15 @@ app.include_router(
     conversations_router
 )
 
+import os
+
+origins = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173"
+).split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -15,3 +15,7 @@ frontend/dist/
 # IDE
 .vscode/
 .idea/
+
+
+frontend/.env
+*.pem
