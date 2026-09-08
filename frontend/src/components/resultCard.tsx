@@ -64,13 +64,6 @@ import {
       return <Package size={19} />;
     }
 
-    function formatStatus(status: string) {
-      return status
-        .replace(/_/g, " ")
-        .replace(/\b\w/g, (letter) =>
-          letter.toUpperCase()
-        );
-    }
   
   
     function getStatusClasses() {
