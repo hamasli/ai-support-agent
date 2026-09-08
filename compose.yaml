@@ -38,8 +38,8 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://postgres:726267@db:5432/ai_support_agent
 
-    ports:
-      - "8000:8000"
+    expose:
+    - "8000"
 
     depends_on:
       db:
